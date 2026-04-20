@@ -88,19 +88,27 @@ export async function PATCH(request: Request) {
 
 /** DELETE /api/admin/users
  *  Body: { email: string }
- *  Removes a user entirely (User row + AdminEmail row). Super admins only.
+ *  Super admins can remove anyone. Regular admins can only remove instructors (non-admins).
  */
 export async function DELETE(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!isSuperAdmin(session.user?.email)) {
-    return NextResponse.json({ error: 'Only super admins can remove users' }, { status: 403 });
+  if (!(await isAdmin(session.user?.email))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   const { email } = await request.json();
   if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 });
   if (email === session.user?.email) {
     return NextResponse.json({ error: 'Cannot remove yourself' }, { status: 400 });
+  }
+
+  // Regular admins can only remove non-admin users
+  if (!isSuperAdmin(session.user?.email)) {
+    const targetIsAdmin = await isAdmin(email);
+    if (targetIsAdmin) {
+      return NextResponse.json({ error: 'Only super admins can remove admins' }, { status: 403 });
+    }
   }
 
   await prisma.user.deleteMany({ where: { email } });

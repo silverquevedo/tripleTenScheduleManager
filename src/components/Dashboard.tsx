@@ -9,10 +9,12 @@ import { ScheduleTable } from './ScheduleTable';
 import { ClearSchedule } from './ClearSchedule';
 import { FloatingPanel } from './FloatingPanel';
 import { Member, Program, ShiftType } from '@/types';
+import { isSuperAdmin as checkSuperAdmin } from '@/lib/super-admins';
 
 export function Dashboard() {
   const { data: session, status } = useSession();
   const isAdmin = session?.user?.isAdmin ?? false;
+  const isSuperAdmin = checkSuperAdmin(session?.user?.email);
 
   const [programs, setPrograms] = useState<Program[]>([]);
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
@@ -76,6 +78,7 @@ export function Dashboard() {
         selectedProgram={selectedProgram}
         onProgramChange={(p) => { setSelectedProgram(p); setMembers([]); }}
         isAdmin={isAdmin}
+        isSuperAdmin={isSuperAdmin}
       />
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-4">
