@@ -2,13 +2,24 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { isAdmin } from '@/lib/admin';
 
 const COLORS = [
   '#4f46e5', '#0891b2', '#059669', '#d97706',
   '#dc2626', '#7c3aed', '#db2777', '#65a30d',
   '#0284c7', '#ea580c', '#14b8a6', '#8b5cf6',
 ];
+
+function nameFromEmail(email: string): string {
+  const local = email.split('@')[0];
+  return local
+    .split('.')
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+    .join(' ');
+}
+
+function pickColor(index: number): string {
+  return COLORS[index % COLORS.length];
+}
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
@@ -17,37 +28,43 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const programId = searchParams.get('programId');
 
-  const members = await prisma.programMember.findMany({
-    where: programId ? { programId } : undefined,
-    orderBy: { displayName: 'asc' },
+  // programId is required — never return members from all programs at once
+  if (!programId) return NextResponse.json([]);
+
+  // Active users with this program
+  const users = await prisma.user.findMany({
+    where: { defaultProgramId: programId },
+    orderBy: { name: 'asc' },
+    select: { id: true, name: true, email: true, color: true, defaultProgramId: true },
   });
-  return NextResponse.json(members);
-}
 
-export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!(await isAdmin(session.user?.email))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const registeredEmails = new Set(users.map((u) => u.email ?? ''));
 
-  const { programId, displayName } = await request.json();
-  if (!programId || !displayName?.trim()) {
-    return NextResponse.json({ error: 'programId and displayName required' }, { status: 400 });
-  }
+  // Pending: in AdminEmail with defaultProgramId but no User record yet
+  const adminEntries = await prisma.adminEmail.findMany({
+    where: { defaultProgramId: programId },
+    orderBy: { email: 'asc' },
+    select: { id: true, email: true, color: true, defaultProgramId: true },
+  });
+  const pending = adminEntries.filter((a) => !registeredEmails.has(a.email));
 
-  const existing = await prisma.programMember.findMany({ where: { programId } });
-  const color = COLORS[existing.length % COLORS.length];
+  const activeMembers = users.map((u, i) => ({
+    id: u.id,
+    programId: u.defaultProgramId!,
+    displayName: u.name ?? u.email ?? 'Unknown',
+    color: u.color ?? pickColor(i),
+    email: u.email ?? undefined,
+    isPending: false,
+  }));
 
-  try {
-    const member = await prisma.programMember.create({
-      data: { programId, displayName: displayName.trim(), color },
-    });
-    return NextResponse.json(member, { status: 201 });
-  } catch (err: unknown) {
-    if ((err as { code?: string }).code === 'P2002') {
-      return NextResponse.json({ error: 'Member already exists' }, { status: 409 });
-    }
-    throw err;
-  }
+  const pendingMembers = pending.map((a, i) => ({
+    id: a.id,
+    programId: a.defaultProgramId!,
+    displayName: nameFromEmail(a.email),
+    color: a.color ?? pickColor(activeMembers.length + i),
+    email: a.email,
+    isPending: true,
+  }));
+
+  return NextResponse.json([...activeMembers, ...pendingMembers]);
 }

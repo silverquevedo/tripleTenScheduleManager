@@ -14,14 +14,14 @@ export default function LoginPage() {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f9f9f8]">
+      <div className="min-h-screen flex items-center justify-center bg-[#F2F1ED]">
         <p className="text-sm text-[#888]">Loading…</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f9f9f8]">
+    <div className="min-h-screen flex items-center justify-center bg-[#F2F1ED]">
       <div className="bg-white border border-[#e5e5e3] rounded-xl p-8 w-full max-w-sm shadow-sm">
         <div className="text-center mb-8">
           <div className="w-10 h-10 rounded-xl bg-[#1a1a1a] flex items-center justify-center mx-auto mb-4">

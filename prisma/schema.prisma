@@ -41,6 +41,7 @@ model User {
   email            String?   @unique
   emailVerified    DateTime?
   image            String?
+  color            String?
   accounts         Account[]
   sessions         Session[]
   createdAt        DateTime  @default(now())
@@ -58,20 +59,9 @@ model VerificationToken {
 // ── App models ────────────────────────────────────────────────────────────────
 
 model Program {
-  id      String          @id @default(cuid())
-  name    String          @unique
-  members ProgramMember[]
-  shifts  Shift[]
-}
-
-model ProgramMember {
-  id          String  @id @default(cuid())
-  programId   String
-  displayName String
-  color       String
-  program     Program @relation(fields: [programId], references: [id], onDelete: Cascade)
-
-  @@unique([programId, displayName])
+  id     String  @id @default(cuid())
+  name   String  @unique
+  shifts Shift[]
 }
 
 model Shift {
@@ -94,4 +84,7 @@ model AdminEmail {
   id               String  @id @default(cuid())
   email            String  @unique
   defaultProgramId String?
+  isManager        Boolean @default(false)
+  isLeadInstructor Boolean @default(true)
+  color            String?
 }

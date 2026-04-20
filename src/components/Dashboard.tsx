@@ -9,12 +9,11 @@ import { ScheduleTable } from './ScheduleTable';
 import { ClearSchedule } from './ClearSchedule';
 import { FloatingPanel } from './FloatingPanel';
 import { Member, Program, ShiftType } from '@/types';
-import { isSuperAdmin as checkSuperAdmin } from '@/lib/super-admins';
 
 export function Dashboard() {
   const { data: session, status } = useSession();
   const isAdmin = session?.user?.isAdmin ?? false;
-  const isSuperAdmin = checkSuperAdmin(session?.user?.email);
+  const isSuperAdmin = session?.user?.isManager ?? false;
 
   const [programs, setPrograms] = useState<Program[]>([]);
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
@@ -54,7 +53,8 @@ export function Dashboard() {
   }, []);
 
   useEffect(() => {
-    fetchMembers(selectedProgram?.id ?? null);
+    if (!selectedProgram) return;
+    fetchMembers(selectedProgram.id);
   }, [selectedProgram, fetchMembers]);
 
   const refreshMembers = useCallback(() => {
@@ -96,7 +96,7 @@ export function Dashboard() {
                     <path strokeLinecap="round" strokeLinejoin="round"
                       d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  <span>Team members</span>
+                  <span>Instructors</span>
                   <div className="flex items-center gap-0.5 ml-1">
                     {members.slice(0, 5).map((m) => (
                       <span key={m.id} className="w-2 h-2 rounded-full"
@@ -113,11 +113,12 @@ export function Dashboard() {
             >
               <div className="px-1 py-1">
                 <p className="text-[11px] text-[#888] uppercase tracking-wide font-medium px-3 pt-2 pb-1">
-                  Team members
+                  Instructors
                 </p>
                 <TeamMembers
                   members={members}
                   programId={selectedProgram.id}
+                  isAdmin={isAdmin}
                   onMembersChange={refreshMembers}
                 />
               </div>

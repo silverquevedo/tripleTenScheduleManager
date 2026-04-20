@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
-import { isSuperAdmin } from '@/lib/super-admins';
 
 type Tab = 'users' | 'programs';
 type FeedbackMsg = { text: string; kind: 'success' | 'error' };
@@ -27,12 +26,15 @@ interface ActiveUser {
   email: string;
   image: string | null;
   isAdmin: boolean;
+  isManager: boolean;
   defaultProgramId: string | null;
 }
 
 interface PendingUser {
   kind: 'pending';
   email: string;
+  isManager: boolean;
+  isLeadInstructor: boolean;
   defaultProgramId: string | null;
 }
 
@@ -56,11 +58,27 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
   const [confirmRemoveEmail, setConfirmRemoveEmail] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
   const [filterProgramId, setFilterProgramId] = useState<string>('');
+  const [sort, setSort] = useState<{ col: 'name' | 'status' | 'role' | 'program'; dir: 'asc' | 'desc' }>({ col: 'name', dir: 'asc' });
   const menuRef = useRef<HTMLDivElement>(null);
   const { feedback, flash } = useFeedback();
 
+  const toggleSort = (col: typeof sort.col) =>
+    setSort((s) => ({ col, dir: s.col === col && s.dir === 'asc' ? 'desc' : 'asc' }));
+
+  const roleWeight = (row: UserRow) => {
+    if (row.isManager) return 3;
+    if (row.kind === 'active') return row.isAdmin ? 2 : 1;
+    return row.isLeadInstructor ? 2 : 1;
+  };
+  const rowDisplayName = (row: UserRow) =>
+    row.kind === 'active' ? (row.name ?? row.email ?? '') : row.email;
+  const rowProgramName = (row: UserRow) =>
+    programs.find((p) => p.id === row.defaultProgramId)?.name ?? '';
+
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<'instructor' | 'leadInstructor' | 'manager'>('instructor');
+  const [inviteProgramId, setInviteProgramId] = useState<string>('');
   const [inviting, setInviting] = useState(false);
   const inviteInputRef = useRef<HTMLInputElement>(null);
 
@@ -73,7 +91,7 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
         (u: Omit<ActiveUser, 'kind'>) => ({ kind: 'active' as const, ...u })
       );
       const pending: PendingUser[] = (pendingAdmins ?? []).map(
-        (p: { email: string; defaultProgramId: string | null }) => ({ kind: 'pending' as const, ...p })
+        (p: { email: string; defaultProgramId: string | null; isManager: boolean; isLeadInstructor: boolean }) => ({ kind: 'pending' as const, ...p })
       );
       setRows([...active, ...pending]);
       setPrograms(Array.isArray(progs) ? progs : []);
@@ -98,6 +116,18 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, grant }),
+    });
+    fetchData();
+    setToggling(null);
+  };
+
+  const toggleManager = async (email: string, grant: boolean) => {
+    setToggling(email);
+    setOpenMenuEmail(null);
+    await fetch('/api/admin/users', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, grantManager: grant }),
     });
     fetchData();
     setToggling(null);
@@ -136,7 +166,7 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
     const res = await fetch('/api/admin/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: inviteEmail.trim() }),
+      body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole, programId: inviteProgramId || undefined }),
     });
     const data = await res.json();
     setInviting(false);
@@ -148,6 +178,8 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
       'success'
     );
     setInviteEmail('');
+    setInviteRole('instructor');
+    setInviteProgramId('');
     setInviteOpen(false);
     fetchData();
   };
@@ -157,6 +189,16 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
   const filteredRows = filterProgramId
     ? rows.filter((r) => r.defaultProgramId === filterProgramId)
     : rows;
+  const d = sort.dir === 'asc' ? 1 : -1;
+  const sortedRows = [...filteredRows].sort((a, b) => {
+    switch (sort.col) {
+      case 'name':    return d * rowDisplayName(a).localeCompare(rowDisplayName(b));
+      case 'status':  return d * ((a.kind === 'active' ? 0 : 1) - (b.kind === 'active' ? 0 : 1));
+      case 'role':    return d * (roleWeight(a) - roleWeight(b));
+      case 'program': return d * rowProgramName(a).localeCompare(rowProgramName(b));
+      default: return 0;
+    }
+  });
 
   return (
     <div className="space-y-3">
@@ -189,22 +231,61 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
       )}
 
       {inviteOpen && (
-        <div className="bg-white border border-[#e5e5e3] rounded-xl p-4 flex items-center gap-3">
-          <div className="flex-1">
-            <label className="text-[11px] text-[#888] uppercase tracking-wide font-medium block mb-1.5">
-              Email address
-            </label>
-            <input
-              ref={inviteInputRef}
-              type="email"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && sendInvite()}
-              placeholder="name@example.com"
-              className="w-full text-sm border border-[#e5e5e3] rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-black/10"
-            />
+        <div className="bg-white border border-[#e5e5e3] rounded-xl p-4 space-y-3">
+          <div className="flex gap-3 flex-wrap">
+            {/* Email */}
+            <div className="flex-1 min-w-[200px]">
+              <label className="text-[11px] text-[#888] uppercase tracking-wide font-medium block mb-1.5">
+                Email address
+              </label>
+              <input
+                ref={inviteInputRef}
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && sendInvite()}
+                placeholder="name@example.com"
+                className="w-full text-sm border border-[#e5e5e3] rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-black/10"
+              />
+            </div>
+
+            {/* Role — managers only */}
+            {superAdmin && (
+              <div>
+                <label className="text-[11px] text-[#888] uppercase tracking-wide font-medium block mb-1.5">
+                  Role
+                </label>
+                <select
+                  value={inviteRole}
+                  onChange={(e) => setInviteRole(e.target.value as typeof inviteRole)}
+                  className="text-sm border border-[#e5e5e3] rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-black/10"
+                >
+                  <option value="instructor">Instructor</option>
+                  <option value="leadInstructor">Lead Instructor</option>
+                  <option value="manager">Manager</option>
+                </select>
+              </div>
+            )}
+
+            {/* Program */}
+            <div>
+              <label className="text-[11px] text-[#888] uppercase tracking-wide font-medium block mb-1.5">
+                Program
+              </label>
+              <select
+                value={inviteProgramId}
+                onChange={(e) => setInviteProgramId(e.target.value)}
+                className="text-sm border border-[#e5e5e3] rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-black/10"
+              >
+                <option value="">— None —</option>
+                {programs.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
-          <div className="flex items-end gap-2 pb-0.5 mt-5">
+
+          <div className="flex gap-2">
             <button
               onClick={sendInvite}
               disabled={inviting || !inviteEmail.trim()}
@@ -213,7 +294,7 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
               {inviting ? 'Sending…' : 'Send invite'}
             </button>
             <button
-              onClick={() => { setInviteOpen(false); setInviteEmail(''); }}
+              onClick={() => { setInviteOpen(false); setInviteEmail(''); setInviteRole('instructor'); setInviteProgramId(''); }}
               className="text-sm px-4 py-2 border border-[#e5e5e3] rounded-lg text-[#888] hover:text-[#1a1a1a] hover:border-[#1a1a1a] transition-colors"
             >
               Cancel
@@ -254,19 +335,25 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#e5e5e3] bg-[#fafafa]">
-                <th className="text-left text-[11px] font-medium text-[#888] uppercase tracking-wide px-5 py-3">User</th>
-                <th className="text-left text-[11px] font-medium text-[#888] uppercase tracking-wide px-4 py-3">Status</th>
-                <th className="text-left text-[11px] font-medium text-[#888] uppercase tracking-wide px-4 py-3">Role</th>
-                <th className="text-left text-[11px] font-medium text-[#888] uppercase tracking-wide px-4 py-3">Program</th>
+                {(['name','status','role','program'] as const).map((col) => (
+                  <th key={col} className={`text-left text-[11px] font-medium text-[#888] uppercase tracking-wide py-3 ${col === 'name' ? 'px-5' : 'px-4'}`}>
+                    <button onClick={() => toggleSort(col)} className="flex items-center gap-1 hover:text-[#1a1a1a] transition-colors">
+                      {col.charAt(0).toUpperCase() + col.slice(1)}
+                      <span className={`text-[10px] ${sort.col === col ? 'text-[#1a1a1a]' : 'text-[#ccc]'}`}>
+                        {sort.col === col ? (sort.dir === 'asc' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </button>
+                  </th>
+                ))}
                 <th className="w-10 px-4 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#e5e5e3]">
-              {filteredRows.map((row) => {
+              {sortedRows.map((row) => {
                 const isSelf = row.kind === 'active' && row.email === currentEmail;
                 const isMenuOpen = openMenuEmail === row.email;
                 const isActive = row.kind === 'active';
-                const isRowSuperAdmin = row.kind === 'active' && isSuperAdmin(row.email);
+                const isRowManager = row.isManager;
                 const isInstructor = row.kind === 'active' && !row.isAdmin;
                 const showMenu = !isSelf && (superAdmin || isInstructor);
 
@@ -314,17 +401,19 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
 
                     <td className="px-4 py-3">
                       <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${
-                        isRowSuperAdmin
+                        isRowManager
                           ? 'bg-purple-50 text-purple-700 border-purple-200'
                           : isInstructor
                             ? 'bg-gray-100 text-[#888] border-[#e5e5e3]'
                             : 'bg-indigo-50 text-indigo-700 border-indigo-200'
                       }`}>
-                        {isRowSuperAdmin
+                        {isRowManager
                           ? 'Manager'
                           : row.kind === 'active'
                             ? (row.isAdmin ? 'Lead Instructor' : 'Instructor')
-                            : 'Lead Instructor'}
+                            : row.isLeadInstructor
+                              ? 'Lead Instructor'
+                              : 'Instructor'}
                       </span>
                     </td>
 
@@ -362,13 +451,54 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
                             </svg>
                           </button>
                           {isMenuOpen && (
-                            <div className="absolute right-0 top-8 z-20 bg-white border border-[#e5e5e3] rounded-xl shadow-lg py-1 min-w-[160px]">
-                              {superAdmin && isActive && (
+                            <div className="absolute right-0 top-8 z-20 bg-white border border-[#e5e5e3] rounded-xl shadow-lg py-1 min-w-[180px]">
+                              {/* Manager options */}
+                              {superAdmin && isActive && isRowManager && (
                                 <button
-                                  onClick={() => toggleAdmin(row.email, !row.isAdmin)}
+                                  onClick={() => toggleManager(row.email, false)}
                                   className="w-full text-left text-xs px-3 py-2 hover:bg-[#f5f5f4] transition-colors text-[#1a1a1a]"
                                 >
-                                  {row.isAdmin ? 'Revoke lead instructor' : 'Make lead instructor'}
+                                  Revoke manager
+                                </button>
+                              )}
+                              {superAdmin && isActive && !isRowManager && row.isAdmin && (
+                                <>
+                                  <button
+                                    onClick={() => toggleAdmin(row.email, false)}
+                                    className="w-full text-left text-xs px-3 py-2 hover:bg-[#f5f5f4] transition-colors text-[#1a1a1a]"
+                                  >
+                                    Revoke lead instructor
+                                  </button>
+                                  <button
+                                    onClick={() => toggleManager(row.email, true)}
+                                    className="w-full text-left text-xs px-3 py-2 hover:bg-[#f5f5f4] transition-colors text-[#1a1a1a]"
+                                  >
+                                    Make manager
+                                  </button>
+                                </>
+                              )}
+                              {superAdmin && isActive && isInstructor && (
+                                <>
+                                  <button
+                                    onClick={() => toggleAdmin(row.email, true)}
+                                    className="w-full text-left text-xs px-3 py-2 hover:bg-[#f5f5f4] transition-colors text-[#1a1a1a]"
+                                  >
+                                    Make lead instructor
+                                  </button>
+                                  <button
+                                    onClick={() => toggleManager(row.email, true)}
+                                    className="w-full text-left text-xs px-3 py-2 hover:bg-[#f5f5f4] transition-colors text-[#1a1a1a]"
+                                  >
+                                    Make manager
+                                  </button>
+                                </>
+                              )}
+                              {superAdmin && !isActive && (
+                                <button
+                                  onClick={() => toggleManager(row.email, true)}
+                                  className="w-full text-left text-xs px-3 py-2 hover:bg-[#f5f5f4] transition-colors text-[#1a1a1a]"
+                                >
+                                  Make manager
                                 </button>
                               )}
                               <button
@@ -441,8 +571,12 @@ function ProgramsTab({ superAdmin }: { superAdmin: boolean }) {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [sort, setSort] = useState<{ col: 'name' | 'members'; dir: 'asc' | 'desc' }>({ col: 'name', dir: 'asc' });
   const menuRef = useRef<HTMLDivElement>(null);
   const { feedback, flash } = useFeedback();
+
+  const toggleSort = (col: typeof sort.col) =>
+    setSort((s) => ({ col, dir: s.col === col && s.dir === 'asc' ? 'desc' : 'asc' }));
 
   const fetchData = () =>
     fetch('/api/programs')
@@ -579,8 +713,16 @@ function ProgramsTab({ superAdmin }: { superAdmin: boolean }) {
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#e5e5e3] bg-[#fafafa]">
-                <th className="text-left text-[11px] font-medium text-[#888] uppercase tracking-wide px-5 py-3">Program</th>
-                <th className="text-left text-[11px] font-medium text-[#888] uppercase tracking-wide px-4 py-3">Members</th>
+                {([['name','Program','px-5'],['members','Members','px-4']] as const).map(([col, label, px]) => (
+                  <th key={col} className={`text-left text-[11px] font-medium text-[#888] uppercase tracking-wide ${px} py-3`}>
+                    <button onClick={() => toggleSort(col)} className="flex items-center gap-1 hover:text-[#1a1a1a] transition-colors">
+                      {label}
+                      <span className={`text-[10px] ${sort.col === col ? 'text-[#1a1a1a]' : 'text-[#ccc]'}`}>
+                        {sort.col === col ? (sort.dir === 'asc' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </button>
+                  </th>
+                ))}
                 <th className="w-10 px-4 py-3"></th>
               </tr>
             </thead>
@@ -591,7 +733,12 @@ function ProgramsTab({ superAdmin }: { superAdmin: boolean }) {
                     No programs yet.
                   </td>
                 </tr>
-              ) : programs.map((p) => {
+              ) : [...programs].sort((a, b) => {
+                const d = sort.dir === 'asc' ? 1 : -1;
+                return sort.col === 'members'
+                  ? d * (a.userCount - b.userCount)
+                  : d * a.name.localeCompare(b.name);
+              }).map((p) => {
                 const isEditing = editingId === p.id;
                 const isMenuOpen = openMenuId === p.id;
 
@@ -714,8 +861,10 @@ function ProgramsTab({ superAdmin }: { superAdmin: boolean }) {
 // ─── Shell ────────────────────────────────────────────────────────────────────
 
 export function SettingsPage() {
-  const { data: session } = useSession();
-  const superAdmin = isSuperAdmin(session?.user?.email);
+  const { data: session, update } = useSession();
+  const superAdmin = session?.user?.isManager ?? false;
+
+  useEffect(() => { update(); }, []);
   const [tab, setTab] = useState<Tab>('users');
 
   const tabs: { id: Tab; label: string }[] = [
@@ -742,7 +891,7 @@ export function SettingsPage() {
 
       <div className="max-w-5xl mx-auto px-4 py-6 flex gap-6 items-start">
         {/* Sidebar */}
-        <nav className="w-44 shrink-0 space-y-0.5">
+        <nav className="w-44 shrink-0 space-y-0.5 sticky top-6 self-start">
           {tabs.map(({ id, label }) => (
             <button
               key={id}

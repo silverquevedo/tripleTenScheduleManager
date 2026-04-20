@@ -1,112 +1,125 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Member } from '@/types';
 
 interface TeamMembersProps {
   members: Member[];
   programId: string;
+  isAdmin: boolean;
   onMembersChange: () => void;
 }
 
-export function TeamMembers({ members, programId, onMembersChange }: TeamMembersProps) {
-  const [newName, setNewName] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [confirmDelete, setConfirmDelete] = useState<Member | null>(null);
+export function TeamMembers({ members, programId, isAdmin, onMembersChange }: TeamMembersProps) {
+  const [confirmRemove, setConfirmRemove] = useState<Member | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const [updatingColor, setUpdatingColor] = useState<string | null>(null);
+  const colorInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  const handleAdd = async () => {
-    if (!newName.trim() || !programId) return;
-    setLoading(true);
-    setError('');
-    try {
-      const res = await fetch('/api/members', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ programId, displayName: newName.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error ?? 'Failed to add member'); return; }
-      setNewName('');
-      onMembersChange();
-    } finally {
-      setLoading(false);
-    }
+  const handleColorChange = async (member: Member, color: string) => {
+    setUpdatingColor(member.id);
+    await fetch(`/api/members/${member.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ color }),
+    });
+    setUpdatingColor(null);
+    onMembersChange();
   };
 
-  const handleDelete = async (member: Member) => {
-    await fetch(`/api/members/${member.id}`, { method: 'DELETE' });
-    setConfirmDelete(null);
+  const handleRemove = async () => {
+    if (!confirmRemove) return;
+    setRemoving(true);
+    await fetch(`/api/members/${confirmRemove.id}`, { method: 'DELETE' });
+    setRemoving(false);
+    setConfirmRemove(null);
     onMembersChange();
   };
 
   return (
-    /* No outer card — rendered inside a <details> wrapper in Dashboard */
-    <div className="p-4">
-      {/* Pill badges */}
-      <div className="flex flex-wrap gap-2 mb-4 min-h-[36px]">
-        {members.map((m) => (
-          <span
-            key={m.id}
-            className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium text-white"
-            style={{ backgroundColor: m.color }}
-          >
-            {m.displayName}
-            <button
-              onClick={() => setConfirmDelete(m)}
-              className="ml-0.5 leading-none opacity-80 hover:opacity-100 transition-opacity text-sm"
-              title={`Remove ${m.displayName}`}
-            >
-              ×
-            </button>
-          </span>
-        ))}
-        {members.length === 0 && (
-          <span className="text-[11px] text-[#bbb]">No members yet</span>
-        )}
-      </div>
+    <div className="p-4 space-y-1">
+      {members.length === 0 && (
+        <p className="text-[11px] text-[#bbb] py-2 text-center">
+          No instructors assigned to this program yet.
+          <br />
+          <span className="text-[10px]">Assign instructors in Settings → Users.</span>
+        </p>
+      )}
 
-      {/* Add member */}
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-          placeholder="Full name…"
-          disabled={loading || !programId}
-          className="flex-1 text-sm border border-[#e5e5e3] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black/10 disabled:opacity-50"
-        />
-        <button
-          onClick={handleAdd}
-          disabled={loading || !newName.trim() || !programId}
-          className="text-sm px-4 py-2 bg-[#1a1a1a] text-white rounded-lg disabled:opacity-40 hover:bg-black transition-colors"
+      {members.map((m) => (
+        <div
+          key={m.id}
+          className="flex items-center gap-2.5 px-1 py-1.5 rounded-lg hover:bg-[#f9f9f8] group"
         >
-          Add
-        </button>
-      </div>
-      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+          {/* Color swatch — clickable for admins */}
+          <div className="relative flex-shrink-0">
+            <button
+              disabled={!isAdmin || updatingColor === m.id}
+              onClick={() => colorInputRefs.current[m.id]?.click()}
+              className="w-5 h-5 rounded-full border-2 border-white shadow-sm ring-1 ring-black/10 disabled:cursor-default transition-transform hover:scale-110"
+              style={{ backgroundColor: m.color }}
+              title={isAdmin ? 'Change color' : m.displayName}
+            />
+            {isAdmin && (
+              <input
+                ref={(el) => { colorInputRefs.current[m.id] = el; }}
+                type="color"
+                defaultValue={m.color}
+                onChange={(e) => handleColorChange(m, e.target.value)}
+                className="sr-only"
+                aria-label={`Color for ${m.displayName}`}
+              />
+            )}
+          </div>
 
-      {/* Confirm delete modal */}
-      {confirmDelete && (
+          <span className="flex-1 text-sm text-[#1a1a1a] truncate">{m.displayName}</span>
+          {m.isPending && (
+            <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200 flex-shrink-0">
+              pending
+            </span>
+          )}
+
+          {isAdmin && (
+            <button
+              onClick={() => setConfirmRemove(m)}
+              className="opacity-0 group-hover:opacity-100 transition-opacity w-5 h-5 flex items-center justify-center rounded text-[#bbb] hover:text-red-500 hover:bg-red-50 flex-shrink-0"
+              title={`Remove ${m.displayName} from program`}
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+      ))}
+
+      {isAdmin && members.length > 0 && (
+        <p className="text-[10px] text-[#bbb] pt-2 border-t border-[#f0f0ef]">
+          Click a color dot to customize. Assign instructors in Settings → Users.
+        </p>
+      )}
+
+      {confirmRemove && (
         <div className="fixed inset-0 bg-black/25 flex items-center justify-center z-50">
           <div className="bg-white border border-[#e5e5e3] rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl">
-            <h3 className="font-semibold text-[#1a1a1a] mb-1">Remove member?</h3>
+            <h3 className="font-semibold text-[#1a1a1a] mb-1">Remove from program?</h3>
             <p className="text-sm text-[#888] mb-5">
-              Remove <strong>{confirmDelete.displayName}</strong> and all their scheduled shifts? This cannot be undone.
+              <strong>{confirmRemove.displayName}</strong> will be removed from this program and all their scheduled shifts will be deleted. This cannot be undone.
             </p>
             <div className="flex gap-3 justify-end">
               <button
-                onClick={() => setConfirmDelete(null)}
+                onClick={() => setConfirmRemove(null)}
+                disabled={removing}
                 className="text-sm px-4 py-2 border border-[#e5e5e3] rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={() => handleDelete(confirmDelete)}
-                className="text-sm px-4 py-2 bg-[#fef2f2] text-[#b91c1c] border border-[#fecaca] rounded-lg hover:bg-red-100 transition-colors"
+                onClick={handleRemove}
+                disabled={removing}
+                className="text-sm px-4 py-2 bg-[#fef2f2] text-[#b91c1c] border border-[#fecaca] rounded-lg hover:bg-red-100 transition-colors disabled:opacity-40"
               >
-                Remove
+                {removing ? 'Removing…' : 'Remove'}
               </button>
             </div>
           </div>

@@ -8,6 +8,8 @@ export interface Member {
   programId: string;
   displayName: string;
   color: string;
+  email?: string;
+  isPending?: boolean;
 }
 
 export interface ShiftType {
