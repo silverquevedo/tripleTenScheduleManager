@@ -10,19 +10,6 @@ interface ShiftManagerProps {
   onShiftChange: () => void;
 }
 
-// Fixed durations for locked tasks; REV is user-selectable.
-const TASK_FIXED_DURATION: Record<string, number> = {
-  'GOH': 120,
-  '1:1': 60,
-};
-const TASK_DEFAULT_DURATION: Record<string, number> = {
-  ...TASK_FIXED_DURATION,
-  'REV': 30,
-};
-
-// Only REV shows the duration selector; all other tasks are locked.
-const isDurationLocked = (code: string) => code in TASK_FIXED_DURATION;
-
 const DURATION_OPTIONS = [
   { label: '30 min', value: 30 },
   { label: '1 hr',   value: 60 },
@@ -31,16 +18,12 @@ const DURATION_OPTIONS = [
   { label: '8 hrs',  value: 480 },
 ];
 
-const SESSION_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8];
-
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
 function minsToTime(m: number) {
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 }
 
 function startOptions(duration: number) {
-  const maxStart = 1440 - duration; // cap so end ≤ 24:00
+  const maxStart = 1440 - duration;
   const count = Math.floor((maxStart - 480) / 30) + 1;
   return Array.from({ length: count }, (_, i) => 480 + i * 30);
 }
@@ -52,49 +35,33 @@ export function ShiftManager({ members, shiftTypes, programId, onShiftChange }: 
   const [employeeDropdownOpen, setEmployeeDropdownOpen] = useState(false);
   const employeeDropdownRef = useRef<HTMLDivElement>(null);
   const [taskCode, setTaskCode] = useState('');
-  const [startMin, setStartMin] = useState(480);   // 08:00
-  const [duration, setDuration] = useState(60);    // 1 hr default (GOH/1:1)
-  const [sessions, setSessions] = useState(1);     // REV only
+  const [startMin, setStartMin] = useState(480);
+  const [duration, setDuration] = useState(60);
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
-  const [autoRefresh, setAutoRefresh] = useState(true);
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackMsg | null>(null);
 
-  // Effective duration: REV uses sessions×30, others use fixed duration
-  const effectiveDuration = taskCode === 'REV' ? sessions * 30 : duration;
-  const endMin = startMin + effectiveDuration;
+  const selectedType = shiftTypes.find((st) => st.code === taskCode);
+  const isLocked = selectedType?.durationLocked ?? false;
+  const safeDuration = Number.isFinite(duration) ? duration : 30;
+  const endMin = startMin + safeDuration;
 
-  // When task changes, lock duration for GOH/1:1; reset sessions for REV
+  // When task changes, set duration from the type's durationMin
   useEffect(() => {
-    if (!taskCode) return;
-    if (taskCode !== 'REV') {
-      const fixedDur = TASK_DEFAULT_DURATION[taskCode] ?? 60;
-      setDuration(fixedDur);
-      const opts = startOptions(fixedDur);
-      if (opts.length > 0 && !opts.includes(startMin)) setStartMin(opts[opts.length - 1]);
-    } else {
-      // REV: keep current sessions, just re-clamp start
-      const opts = startOptions(sessions * 30);
-      if (opts.length > 0 && !opts.includes(startMin)) setStartMin(opts[opts.length - 1]);
-    }
+    if (!selectedType) return;
+    const dur = selectedType.durationMin ?? 30;
+    setDuration(dur);
+    const opts = startOptions(dur);
+    if (opts.length > 0 && !opts.includes(startMin)) setStartMin(opts[opts.length - 1]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskCode]);
 
-  // Clamp start when duration (GOH/1:1) changes
+  // Clamp start when duration changes
   useEffect(() => {
-    if (taskCode === 'REV') return;
     const opts = startOptions(duration);
     if (opts.length > 0 && !opts.includes(startMin)) setStartMin(opts[opts.length - 1]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [duration]);
-
-  // Clamp start when REV session count changes
-  useEffect(() => {
-    if (taskCode !== 'REV') return;
-    const opts = startOptions(sessions * 30);
-    if (opts.length > 0 && !opts.includes(startMin)) setStartMin(opts[opts.length - 1]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessions]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -117,7 +84,6 @@ export function ShiftManager({ members, shiftTypes, programId, onShiftChange }: 
   const toggleDay = (d: number) =>
     setSelectedDays((p) => (p.includes(d) ? p.filter((x) => x !== d) : [...p, d]));
 
-
   const handleAction = async (action: 'add' | 'remove') => {
     if (!programId || !selectedMembers.length || !taskCode || !selectedDays.length) {
       flash('Select at least one employee, a task, and one day.', 'error');
@@ -128,15 +94,7 @@ export function ShiftManager({ members, shiftTypes, programId, onShiftChange }: 
       const res = await fetch('/api/shifts', {
         method: action === 'add' ? 'POST' : 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          programId,
-          memberNames: selectedMembers,
-          taskCode,
-          days: selectedDays,
-          startMin,
-          endMin,
-          sessions: taskCode === 'REV' ? sessions : 1,
-        }),
+        body: JSON.stringify({ programId, memberNames: selectedMembers, taskCode, days: selectedDays, startMin, endMin, sessions: 1 }),
       });
       const data = await res.json();
       if (!res.ok) { flash(data.error ?? 'An error occurred.', 'error'); return; }
@@ -144,7 +102,7 @@ export function ShiftManager({ members, shiftTypes, programId, onShiftChange }: 
         action === 'add' ? `Added ${data.created} shift(s).` : `Removed ${data.deleted} shift(s).`,
         'success'
       );
-      if (autoRefresh) onShiftChange();
+      onShiftChange();
     } finally {
       setLoading(false);
     }
@@ -153,7 +111,7 @@ export function ShiftManager({ members, shiftTypes, programId, onShiftChange }: 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 bg-white border-b border-[#e5e5e3]">
 
-      {/* ── Employees: dropdown with name + color ── */}
+      {/* ── Employees ── */}
       <div className="relative flex-shrink-0" ref={employeeDropdownRef}>
         <button
           onClick={() => setEmployeeDropdownOpen((v) => !v)}
@@ -163,21 +121,14 @@ export function ShiftManager({ members, shiftTypes, programId, onShiftChange }: 
             <span className="text-[#888]">Select instructors…</span>
           ) : selectedMembers.length === 1 ? (
             <>
-              <span
-                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                style={{ backgroundColor: members.find((m) => m.displayName === selectedMembers[0])?.color }}
-              />
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: members.find((m) => m.displayName === selectedMembers[0])?.color }} />
               <span className="text-[#1a1a1a] truncate max-w-[80px]">{selectedMembers[0]}</span>
             </>
           ) : (
             <>
               <div className="flex -space-x-1">
                 {selectedMembers.slice(0, 3).map((name) => (
-                  <span
-                    key={name}
-                    className="w-2.5 h-2.5 rounded-full border border-white flex-shrink-0"
-                    style={{ backgroundColor: members.find((m) => m.displayName === name)?.color }}
-                  />
+                  <span key={name} className="w-2.5 h-2.5 rounded-full border border-white flex-shrink-0" style={{ backgroundColor: members.find((m) => m.displayName === name)?.color }} />
                 ))}
               </div>
               <span className="text-[#1a1a1a]">{selectedMembers.length} selected</span>
@@ -189,15 +140,9 @@ export function ShiftManager({ members, shiftTypes, programId, onShiftChange }: 
         </button>
         {employeeDropdownOpen && (
           <div className="absolute top-full left-0 mt-1 bg-white border border-[#e5e5e3] rounded-xl shadow-lg z-20 min-w-[170px] py-1">
-            {members.length === 0 && (
-              <p className="text-[11px] text-[#bbb] px-3 py-2">No members</p>
-            )}
+            {members.length === 0 && <p className="text-[11px] text-[#bbb] px-3 py-2">No members</p>}
             {members.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => toggleMember(m.displayName)}
-                className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 text-xs text-left"
-              >
+              <button key={m.id} onClick={() => toggleMember(m.displayName)} className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 text-xs text-left">
                 <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: m.color }} />
                 <span className="flex-1 text-[#1a1a1a]">{m.displayName}</span>
                 {selectedMembers.includes(m.displayName) && (
@@ -213,7 +158,7 @@ export function ShiftManager({ members, shiftTypes, programId, onShiftChange }: 
 
       <div className="w-px h-4 bg-[#e5e5e3] flex-shrink-0" />
 
-      {/* ── Task: pill chips ── */}
+      {/* ── Event type chips ── */}
       <div className="flex items-center gap-1 flex-shrink-0">
         {shiftTypes.map((st) => (
           <button
@@ -233,25 +178,25 @@ export function ShiftManager({ members, shiftTypes, programId, onShiftChange }: 
 
       <div className="w-px h-4 bg-[#e5e5e3] flex-shrink-0" />
 
-      {/* ── Start time + Sessions (REV) + time range ── */}
+      {/* ── Start time + duration (if not locked) ── */}
       <div className="flex items-center gap-1.5 flex-shrink-0">
         <select
           value={startMin}
           onChange={(e) => setStartMin(Number(e.target.value))}
           className="text-xs border border-[#e5e5e3] rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-black/10"
         >
-          {startOptions(effectiveDuration).map((m) => (
+          {startOptions(duration).map((m) => (
             <option key={m} value={m}>{minsToTime(m)}</option>
           ))}
         </select>
-        {taskCode === 'REV' && (
+        {taskCode && !isLocked && (
           <select
-            value={sessions}
-            onChange={(e) => setSessions(Number(e.target.value))}
+            value={duration}
+            onChange={(e) => setDuration(Number(e.target.value))}
             className="text-xs border border-[#e5e5e3] rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-black/10"
           >
-            {SESSION_OPTIONS.map((n) => (
-              <option key={n} value={n}>{n}×</option>
+            {DURATION_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
         )}
@@ -264,7 +209,7 @@ export function ShiftManager({ members, shiftTypes, programId, onShiftChange }: 
 
       <div className="w-px h-4 bg-[#e5e5e3] flex-shrink-0" />
 
-      {/* ── Days: small toggle pills ── */}
+      {/* ── Days ── */}
       <div className="flex items-center gap-1 flex-shrink-0">
         {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((d, i) => (
           <button
@@ -285,28 +230,17 @@ export function ShiftManager({ members, shiftTypes, programId, onShiftChange }: 
 
       {/* ── Actions ── */}
       <div className="flex items-center gap-2 flex-shrink-0">
-        <button
-          onClick={() => handleAction('add')}
-          disabled={loading || !programId}
-          className="text-xs px-3 py-1.5 bg-[#1a1a1a] text-white rounded-lg disabled:opacity-40 hover:bg-black transition-colors"
-        >
+        <button onClick={() => handleAction('add')} disabled={loading || !programId} className="text-xs px-3 py-1.5 bg-[#1a1a1a] text-white rounded-lg disabled:opacity-40 hover:bg-black transition-colors">
           Add
         </button>
-        <button
-          onClick={() => handleAction('remove')}
-          disabled={loading || !programId}
-          className="text-xs px-3 py-1.5 bg-[#fef2f2] text-[#b91c1c] border border-[#fecaca] rounded-lg disabled:opacity-40 hover:bg-red-100 transition-colors"
-        >
+        <button onClick={() => handleAction('remove')} disabled={loading || !programId} className="text-xs px-3 py-1.5 bg-[#fef2f2] text-[#b91c1c] border border-[#fecaca] rounded-lg disabled:opacity-40 hover:bg-red-100 transition-colors">
           Remove
         </button>
       </div>
 
-      {/* ── Inline feedback ── */}
       {feedback && (
         <span className={`text-[11px] px-2.5 py-1 rounded-lg border flex-shrink-0 ${
-          feedback.kind === 'success'
-            ? 'bg-green-50 text-green-700 border-green-200'
-            : 'bg-red-50 text-red-700 border-red-200'
+          feedback.kind === 'success' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'
         }`}>
           {feedback.text}
         </span>

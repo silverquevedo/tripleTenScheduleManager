@@ -10,6 +10,82 @@ import { ClearSchedule } from './ClearSchedule';
 import { FloatingPanel } from './FloatingPanel';
 import { Member, Program, ShiftType } from '@/types';
 
+function DashboardSkeleton() {
+  return (
+    <div className="min-h-screen bg-[#f9f9f8]">
+      {/* Header */}
+      <div className="bg-white border-b border-[#e5e5e3] sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="h-4 w-44 rounded bg-[#e5e5e3] animate-pulse" />
+            <div className="h-8 w-28 rounded-lg bg-[#e5e5e3] animate-pulse" />
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="h-5 w-16 rounded-full bg-[#e5e5e3] animate-pulse" />
+            <div className="h-7 w-24 rounded-lg bg-[#e5e5e3] animate-pulse" />
+          </div>
+        </div>
+      </div>
+      <main className="max-w-7xl mx-auto px-4 py-6 space-y-4">
+        {/* Action buttons */}
+        <div className="flex gap-3">
+          <div className="h-9 w-36 rounded-xl bg-[#e5e5e3] animate-pulse" />
+          <div className="h-9 w-36 rounded-xl bg-[#e5e5e3] animate-pulse" />
+        </div>
+        {/* Schedule card */}
+        <div className="bg-white border border-[#e5e5e3] rounded-xl overflow-hidden">
+          {/* Card header */}
+          <div className="px-4 py-3 border-b border-[#e5e5e3] flex items-center justify-between">
+            <div className="h-4 w-32 rounded bg-[#e5e5e3] animate-pulse" />
+            <div className="flex gap-2">
+              <div className="h-7 w-24 rounded-lg bg-[#e5e5e3] animate-pulse" />
+              <div className="h-7 w-20 rounded-lg bg-[#e5e5e3] animate-pulse" />
+            </div>
+          </div>
+          {/* Table skeleton */}
+          <div className="p-4 overflow-x-auto">
+            <table className="border-collapse" style={{ minWidth: 720 }}>
+              <thead>
+                <tr>
+                  <th className="py-2 px-3 border-b border-[#e5e5e3] w-14">
+                    <div className="h-3 w-8 rounded bg-[#e5e5e3] animate-pulse" />
+                  </th>
+                  {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => (
+                    <th key={d} className="py-2 px-2 border-b border-[#e5e5e3] min-w-[96px]">
+                      <div className="h-3 w-7 rounded bg-[#e5e5e3] animate-pulse" />
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'}>
+                    <td className="py-1.5 px-3 border-r border-[#e5e5e3]">
+                      <div className="h-3 w-9 rounded bg-[#e5e5e3] animate-pulse" />
+                    </td>
+                    {Array.from({ length: 7 }).map((_, j) => (
+                      <td key={j} className="py-1.5 px-1.5 border-r border-[#e5e5e3] last:border-r-0">
+                        {(i + j) % 3 !== 2 && (
+                          <div className="flex gap-1">
+                            <div className="h-5 rounded-full bg-[#e5e5e3] animate-pulse" style={{ width: 52 + ((i * 7 + j) % 5) * 8 }} />
+                            {(i + j) % 2 === 0 && (
+                              <div className="h-5 rounded-full bg-[#e5e5e3] animate-pulse" style={{ width: 48 + ((i + j) % 4) * 6 }} />
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
 export function Dashboard() {
   const { data: session, status } = useSession();
   const isAdmin = session?.user?.isAdmin ?? false;
@@ -64,11 +140,7 @@ export function Dashboard() {
   const triggerScheduleRefresh = useCallback(() => setScheduleRefresh((n) => n + 1), []);
 
   if (bootstrapping) {
-    return (
-      <div className="min-h-screen bg-[#f9f9f8] flex items-center justify-center">
-        <p className="text-sm text-[#888]">Loading…</p>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (

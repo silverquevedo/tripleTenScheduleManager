@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { Member, Shift, ShiftType } from '@/types';
 
 interface ScheduleTableProps {
@@ -13,13 +14,6 @@ interface ScheduleTableProps {
   toolbar?: React.ReactNode;
 }
 
-function DownloadIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-    </svg>
-  );
-}
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const DAYS_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -32,25 +26,28 @@ function minsToTime(m: number) {
   return `${String(Math.floor(wrapped / 60)).padStart(2, '0')}:${String(wrapped % 60).padStart(2, '0')}`;
 }
 
-interface PendingDeletion {
-  shift: Shift;
-  timeoutId: ReturnType<typeof setTimeout>;
-}
 
 export function ScheduleTable({
   programId, programName, members, shiftTypes, refreshTrigger, isAdmin, toolbar,
 }: ScheduleTableProps) {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
   const [toolbarOpen, setToolbarOpen] = useState(false);
-  const [pendingDeletions, setPendingDeletions] = useState<PendingDeletion[]>([]);
-  const [internalRefresh, setInternalRefresh] = useState(0);
-  const pendingRef = useRef(pendingDeletions);
-  pendingRef.current = pendingDeletions;
+  // IDs of shifts hidden optimistically while awaiting the undo window
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
+  // Tracks which shifts the user clicked Undo on, to cancel the DELETE
+  const undoneRef = useRef<Set<string>>(new Set());
   const scrollWrapRef = useRef<HTMLDivElement>(null);
   // Only scroll on program load/change, not on add/delete refreshes
   const shouldScrollRef = useRef(true);
+
+  // Reset isInitialLoad and scroll flag whenever the program selection changes
+  useEffect(() => {
+    setIsInitialLoad(true);
+    shouldScrollRef.current = true;
+  }, [programId]);
 
   // Start at 10:00 by default; if any shift is earlier, expand to cover it
   const slotMins = useMemo(() => {
@@ -58,11 +55,6 @@ export function ScheduleTable({
     const start = Math.min(DEFAULT_START, Math.floor(earliest / 30) * 30);
     return Array.from({ length: SLOT_COUNT }, (_, i) => start + i * 30);
   }, [shifts]);
-
-  // Reset scroll flag whenever the program selection changes
-  useEffect(() => {
-    shouldScrollRef.current = true;
-  }, [programId]);
 
   // Auto-scroll to the first occupied slot (minus one row) — only on program load
   useEffect(() => {
@@ -91,21 +83,15 @@ export function ScheduleTable({
     const url = programId ? `/api/shifts?programId=${programId}` : '/api/shifts';
     fetch(url)
       .then((r) => r.json())
-      .then((data) => setShifts(Array.isArray(data) ? data : []))
+      .then((data) => {
+        setShifts(Array.isArray(data) ? data : []);
+        setIsInitialLoad(false);
+      })
       .finally(() => setLoading(false));
   }, [programId]);
 
-  useEffect(() => { fetchShifts(); }, [fetchShifts, refreshTrigger, internalRefresh]);
+  useEffect(() => { fetchShifts(); }, [fetchShifts, refreshTrigger]);
 
-  // Flush pending deletes when program changes or component unmounts
-  useEffect(() => {
-    return () => {
-      pendingRef.current.forEach((pd) => {
-        clearTimeout(pd.timeoutId);
-        fetch(`/api/shifts/${pd.shift.id}`, { method: 'DELETE' });
-      });
-    };
-  }, [programId]);
 
   const colorOf = (name: string) =>
     members.find((m) => m.displayName === name)?.color ?? '#6b7280';
@@ -113,103 +99,186 @@ export function ScheduleTable({
   const labelOf = (code: string) =>
     shiftTypes.find((st) => st.code === code)?.label ?? code;
 
-  const visibleShifts = shifts.filter(
-    (s) => !pendingDeletions.some((p) => p.shift.id === s.id)
+  const visibleShifts = shifts.filter((s) => !hiddenIds.has(s.id));
+
+  // Map keyed by `${dayOfWeek}|${timeMin}|${memberName}` → Shift
+  // Built by expanding each shift across its 30-min slots
+  const shiftLookup = useMemo(() => {
+    const map = new Map<string, Shift>();
+    for (const s of visibleShifts) {
+      let t = s.startMin;
+      while (t < s.endMin) {
+        map.set(`${s.dayOfWeek}|${t}|${s.memberName}`, s);
+        t += 30;
+      }
+    }
+    return map;
+  }, [visibleShifts]);
+
+  /** Optimistic delete with 8-second undo window via Sonner toast */
+  const handleDeleteShift = (shift: Shift) => {
+    // Hide immediately
+    setHiddenIds((prev) => new Set(prev).add(shift.id));
+
+    const commit = () => {
+      if (undoneRef.current.has(shift.id)) {
+        undoneRef.current.delete(shift.id);
+        return;
+      }
+      // Remove from local state (no re-fetch needed — avoids the reappear glitch)
+      setShifts((prev) => prev.filter((s) => s.id !== shift.id));
+      setHiddenIds((prev) => { const next = new Set(prev); next.delete(shift.id); return next; });
+      fetch(`/api/shifts/${shift.id}`, { method: 'DELETE' });
+    };
+
+    toast('Shift removed', {
+      duration: 8000,
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          undoneRef.current.add(shift.id);
+          setHiddenIds((prev) => { const next = new Set(prev); next.delete(shift.id); return next; });
+        },
+      },
+      onAutoClose: commit,
+      onDismiss: commit,
+    });
+  };
+
+  const skeletonRows = (
+    <tbody>
+      {Array.from({ length: 12 }).map((_, i) => (
+        <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'}>
+          <td className="py-1 px-3 border-r border-[#e5e5e3] align-top">
+            <div className="h-3 w-9 rounded bg-[#e5e5e3] animate-pulse" />
+          </td>
+          {DAYS.map((_, j) => {
+            const pillCount = (i * 3 + j) % 4 === 0 ? 0 : Math.min(2, members.length);
+            return (
+              <td key={j} className="py-1 px-1.5 border-r border-[#e5e5e3] last:border-r-0 align-top">
+                <div className="flex flex-nowrap gap-1">
+                  {Array.from({ length: pillCount }).map((_, k) => {
+                    const m = members[k];
+                    return (
+                      <span
+                        key={k}
+                        className="inline-block rounded-full animate-pulse"
+                        style={{
+                          backgroundColor: m ? m.color : '#e5e5e3',
+                          opacity: 0.25,
+                          minWidth: 52,
+                          height: 18,
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </td>
+            );
+          })}
+        </tr>
+      ))}
+    </tbody>
   );
 
-  const cellShifts = (slotMin: number, day: number) =>
-    visibleShifts.filter((s) => s.dayOfWeek === day && s.startMin <= slotMin && s.endMin > slotMin);
+  const dataRows = (
+    <tbody>
+      {slotMins.map((slotMin, rowIdx) => (
+        <tr key={slotMin} data-slot={slotMin} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'}>
+          <td className="py-1 px-3 text-[11px] text-[#aaa] font-mono border-r border-[#e5e5e3] whitespace-nowrap align-top">
+            {minsToTime(slotMin)}
+          </td>
+          {DAYS.map((_, dayIdx) => {
+            if (members.length === 0) {
+              // Fallback: show shifts sorted by memberName when no members loaded
+              const fallbackShifts = visibleShifts
+                .filter((s) => s.dayOfWeek === dayIdx && s.startMin <= slotMin && s.endMin > slotMin)
+                .sort((a, b) => a.memberName.localeCompare(b.memberName));
+              return (
+                <td key={dayIdx}
+                  className="py-1 px-1.5 border-r border-[#e5e5e3] last:border-r-0 align-top">
+                  <div className="flex flex-nowrap gap-1">
+                    {fallbackShifts.map((s) => (
+                      <span
+                        key={`${s.id}-${slotMin}`}
+                        title={`${s.memberName} · ${labelOf(s.taskCode)} · ${minsToTime(s.startMin)}–${minsToTime(s.endMin)}`}
+                        className="group inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-white font-medium whitespace-nowrap"
+                        style={{ backgroundColor: colorOf(s.memberName), fontSize: '10px' }}
+                      >
+                        <strong>{s.memberName.split(' ')[0]}</strong>
+                        <span className="opacity-75 mx-0.5">{s.taskCode}</span>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleDeleteShift(s)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity leading-none font-bold text-white/90 hover:text-white"
+                            title="Remove this shift"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                </td>
+              );
+            }
 
-  /** Optimistic delete — waits 8s before calling API so user can undo */
-  const handleDeleteShift = (shift: Shift) => {
-    const timeoutId = setTimeout(() => {
-      fetch(`/api/shifts/${shift.id}`, { method: 'DELETE' }).then(() => {
-        setPendingDeletions((prev) => prev.filter((p) => p.shift.id !== shift.id));
-        setInternalRefresh((n) => n + 1);
-      });
-    }, 8000);
-    setPendingDeletions((prev) => [...prev, { shift, timeoutId }]);
-  };
-
-  const handleUndoAll = () => {
-    setPendingDeletions((prev) => {
-      prev.forEach((p) => clearTimeout(p.timeoutId));
-      return [];
-    });
-  };
-
-  const confirmAll = () => {
-    pendingDeletions.forEach((p) => {
-      clearTimeout(p.timeoutId);
-      fetch(`/api/shifts/${p.shift.id}`, { method: 'DELETE' });
-    });
-    setPendingDeletions([]);
-    setInternalRefresh((n) => n + 1);
-  };
+            return (
+              <td key={dayIdx}
+                className="py-1 px-1.5 border-r border-[#e5e5e3] last:border-r-0 align-top">
+                <div className="flex flex-nowrap gap-1">
+                  {members.map((m) => {
+                    const s = shiftLookup.get(`${dayIdx}|${slotMin}|${m.displayName}`);
+                    if (!s) return null;
+                    return (
+                      <span
+                        key={`${s.id}-${slotMin}`}
+                        title={`${s.memberName} · ${labelOf(s.taskCode)} · ${minsToTime(s.startMin)}–${minsToTime(s.endMin)}`}
+                        className="group inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-white font-medium whitespace-nowrap"
+                        style={{ backgroundColor: m.color, fontSize: '10px' }}
+                      >
+                        <strong>{s.memberName.split(' ')[0]}</strong>
+                        <span className="opacity-75 mx-0.5">{s.taskCode}</span>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleDeleteShift(s)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity leading-none font-bold text-white/90 hover:text-white"
+                            title="Remove this shift"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </span>
+                    );
+                  })}
+                </div>
+              </td>
+            );
+          })}
+        </tr>
+      ))}
+    </tbody>
+  );
 
   const tableGrid = (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse min-w-[720px]">
-        <thead>
+    <table className="border-separate border-spacing-0">
+        <thead className="sticky top-0 z-[1]">
           <tr>
-            <th className="text-left py-2 px-3 text-[11px] font-medium text-[#888] w-14 border-b border-[#e5e5e3]">
+            <th className="text-left py-2 px-3 text-[11px] font-medium text-[#888] w-14 border-b border-[#e5e5e3] bg-white">
               Time
             </th>
             {DAYS.map((d, i) => (
               <th key={d}
-                className="text-left py-2 px-2 text-[11px] font-medium text-[#888] border-b border-[#e5e5e3] min-w-[96px]">
+                className="text-left py-2 px-2 text-[11px] font-medium text-[#888] border-b border-[#e5e5e3] min-w-[96px] bg-white">
                 <span className="hidden lg:inline">{d}</span>
                 <span className="lg:hidden">{DAYS_SHORT[i]}</span>
               </th>
             ))}
           </tr>
         </thead>
-        <tbody>
-          {slotMins.map((slotMin, rowIdx) => (
-            <tr key={slotMin} data-slot={slotMin} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'}>
-              <td className="py-1 px-3 text-[11px] text-[#aaa] font-mono border-r border-[#e5e5e3] whitespace-nowrap align-top">
-                {minsToTime(slotMin)}
-              </td>
-              {DAYS.map((_, dayIdx) => {
-                const cells = cellShifts(slotMin, dayIdx);
-                return (
-                  <td key={dayIdx}
-                    className="py-1 px-1.5 border-r border-[#e5e5e3] last:border-r-0 align-top">
-                    <div className="flex flex-wrap gap-1">
-                      {cells.map((s) => (
-                        <span
-                          key={`${s.id}-${slotMin}`}
-                          title={`${s.memberName} · ${labelOf(s.taskCode)} · ${minsToTime(s.startMin)}–${minsToTime(s.endMin)}`}
-                          className="group inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-white font-medium whitespace-nowrap"
-                          style={{ backgroundColor: colorOf(s.memberName), fontSize: '10px' }}
-                        >
-                          <strong>{s.memberName.split(' ')[0]}</strong>
-                          <span className="opacity-75 mx-0.5">{s.taskCode}</span>
-                          {isAdmin && (
-                            <button
-                              onClick={() => handleDeleteShift(s)}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity leading-none font-bold text-white/90 hover:text-white"
-                              title="Remove this shift"
-                            >
-                              ×
-                            </button>
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
+        {isInitialLoad && loading ? skeletonRows : dataRows}
       </table>
-    </div>
   );
-
-  const handleExport = () => {
-    window.location.href = `/api/export/schedule?programId=${programId}`;
-  };
 
   const headerBar = (
     <div className="flex items-center justify-between px-4 py-3">
@@ -220,7 +289,7 @@ export function ScheduleTable({
             {visibleShifts.length} shift{visibleShifts.length !== 1 ? 's' : ''}
           </span>
         )}
-        {loading && <span className="text-[11px] text-[#bbb]">Loading…</span>}
+        {loading && !isInitialLoad && <span className="text-[11px] text-[#bbb]">Loading…</span>}
       </div>
       <div className="flex items-center gap-2">
         {toolbar && (
@@ -239,14 +308,6 @@ export function ScheduleTable({
             Edit shifts
           </button>
         )}
-        <button
-          onClick={handleExport}
-          className="flex items-center gap-1.5 text-xs font-medium text-[#888] border border-[#e5e5e3] rounded-lg px-3 py-1.5 hover:text-[#1a1a1a] hover:border-[#1a1a1a] transition-colors"
-          title="Download schedule as CSV"
-        >
-          <DownloadIcon />
-          Export CSV
-        </button>
         <button
           onClick={() => setFullscreen(true)}
           className="flex items-center gap-1.5 text-xs font-medium text-[#888] border border-[#e5e5e3] rounded-lg px-3 py-1.5 hover:text-[#1a1a1a] hover:border-[#1a1a1a] transition-colors"
@@ -280,7 +341,7 @@ export function ScheduleTable({
           </div>
         )}
 
-        <div ref={scrollWrapRef} className="overflow-y-auto max-h-[520px] p-4">
+        <div ref={scrollWrapRef} className="overflow-auto max-h-[520px] px-4 pb-4">
           {tableGrid}
         </div>
       </div>
@@ -297,25 +358,16 @@ export function ScheduleTable({
                   {visibleShifts.length} shift{visibleShifts.length !== 1 ? 's' : ''}
                 </span>
               )}
-              {loading && <span className="text-[11px] text-[#bbb]">Loading…</span>}
+              {loading && !isInitialLoad && <span className="text-[11px] text-[#bbb]">Loading…</span>}
             </div>
             <div className="flex items-center gap-2">
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-1.5 text-xs font-medium text-[#888] border border-[#e5e5e3] rounded-lg px-3 py-1.5 hover:text-[#1a1a1a] hover:border-[#1a1a1a] transition-colors"
-              title="Download schedule as CSV"
-            >
-              <DownloadIcon />
-              Export CSV
-            </button>
             <button
               onClick={() => setFullscreen(false)}
               className="flex items-center gap-1.5 text-xs font-medium text-[#888] border border-[#e5e5e3] rounded-lg px-3 py-1.5 hover:text-[#1a1a1a] hover:border-[#1a1a1a] transition-colors"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"
                 stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round"
-                  d="M9 9L4 4m0 0h5M4 4v5m11-1V4m0 0h-4m4 0l-5 5M9 15l-5 5m0 0h5m-5 0v-5m16 0v5m0 0h-5m5 0l-5-5" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
               Close
             </button>
@@ -325,25 +377,6 @@ export function ScheduleTable({
         </div>
       )}
 
-      {/* ── Undo toast ── */}
-      {pendingDeletions.length > 0 && (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-[#1a1a1a] text-white text-sm px-5 py-3 rounded-xl shadow-xl">
-          <span>
-            {pendingDeletions.length === 1
-              ? '1 shift removed'
-              : `${pendingDeletions.length} shifts removed`}
-          </span>
-          <button onClick={handleUndoAll}
-            className="text-blue-400 hover:text-blue-300 font-semibold transition-colors">
-            Undo
-          </button>
-          <div className="w-px h-4 bg-white/20" />
-          <button onClick={confirmAll}
-            className="text-white/50 hover:text-white/80 text-xs transition-colors">
-            Confirm now
-          </button>
-        </div>
-      )}
     </>
   );
 }

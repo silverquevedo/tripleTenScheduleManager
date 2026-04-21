@@ -8,7 +8,10 @@
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({**d.get\\('dependencies',{}\\), **d.get\\('devDependencies',{}\\)}, indent=2\\)\\)\")",
       "Bash(npm run:*)",
       "mcp__Claude_Preview__preview_start",
-      "Bash(kill 21251)"
+      "Bash(kill 21251)",
+      "Bash(npm install:*)",
+      "Bash(npx tsx:*)",
+      "Bash(pkill -f \"next dev\")"
     ]
   }
 }

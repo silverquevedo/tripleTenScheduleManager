@@ -20,14 +20,14 @@ async function main() {
 
   // Shift types
   const shiftTypes = [
-    { code: '1:1', label: '1:1 & MTI' },
-    { code: 'REV', label: 'Review' },
-    { code: 'GOH', label: 'Group Office Hours' },
+    { code: '1:1', label: '1:1 & MTI',          durationMin: 60,  durationLocked: true  },
+    { code: 'REV', label: 'Review',              durationMin: 30,  durationLocked: false },
+    { code: 'GOH', label: 'Group Office Hours',  durationMin: 120, durationLocked: true  },
   ];
   for (const st of shiftTypes) {
     await prisma.shiftType.upsert({
       where: { code: st.code },
-      update: { label: st.label },
+      update: { label: st.label, durationMin: st.durationMin, durationLocked: st.durationLocked },
       create: st,
     });
   }

@@ -15,6 +15,8 @@ export interface Member {
 export interface ShiftType {
   code: string;
   label: string;
+  durationMin: number;
+  durationLocked: boolean;
 }
 
 export interface Shift {

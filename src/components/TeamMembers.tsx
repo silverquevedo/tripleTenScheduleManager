@@ -13,18 +13,26 @@ interface TeamMembersProps {
 export function TeamMembers({ members, programId, isAdmin, onMembersChange }: TeamMembersProps) {
   const [confirmRemove, setConfirmRemove] = useState<Member | null>(null);
   const [removing, setRemoving] = useState(false);
-  const [updatingColor, setUpdatingColor] = useState<string | null>(null);
+  // Live color preview — updated on every mouse move, no API call yet
+  const [localColors, setLocalColors] = useState<Record<string, string>>({});
   const colorInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  // Debounce timers — one per member, fires API call after user stops dragging
+  const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  const handleColorChange = async (member: Member, color: string) => {
-    setUpdatingColor(member.id);
-    await fetch(`/api/members/${member.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ color }),
-    });
-    setUpdatingColor(null);
-    onMembersChange();
+  const handleColorChange = (member: Member, color: string) => {
+    // Instant visual feedback
+    setLocalColors((prev) => ({ ...prev, [member.id]: color }));
+
+    // Cancel any in-flight debounce for this member
+    clearTimeout(debounceTimers.current[member.id]);
+    debounceTimers.current[member.id] = setTimeout(async () => {
+      await fetch(`/api/members/${member.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ color }),
+      });
+      onMembersChange();
+    }, 400);
   };
 
   const handleRemove = async () => {
@@ -54,17 +62,17 @@ export function TeamMembers({ members, programId, isAdmin, onMembersChange }: Te
           {/* Color swatch — clickable for admins */}
           <div className="relative flex-shrink-0">
             <button
-              disabled={!isAdmin || updatingColor === m.id}
+              disabled={!isAdmin}
               onClick={() => colorInputRefs.current[m.id]?.click()}
               className="w-5 h-5 rounded-full border-2 border-white shadow-sm ring-1 ring-black/10 disabled:cursor-default transition-transform hover:scale-110"
-              style={{ backgroundColor: m.color }}
+              style={{ backgroundColor: localColors[m.id] ?? m.color }}
               title={isAdmin ? 'Change color' : m.displayName}
             />
             {isAdmin && (
               <input
                 ref={(el) => { colorInputRefs.current[m.id] = el; }}
                 type="color"
-                defaultValue={m.color}
+                value={localColors[m.id] ?? m.color}
                 onChange={(e) => handleColorChange(m, e.target.value)}
                 className="sr-only"
                 aria-label={`Color for ${m.displayName}`}

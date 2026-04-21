@@ -4,18 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
+import { toast } from 'sonner';
 
-type Tab = 'users' | 'programs';
-type FeedbackMsg = { text: string; kind: 'success' | 'error' };
-
-function useFeedback() {
-  const [feedback, setFeedback] = useState<FeedbackMsg | null>(null);
-  const flash = (text: string, kind: FeedbackMsg['kind']) => {
-    setFeedback({ text, kind });
-    setTimeout(() => setFeedback(null), 4000);
-  };
-  return { feedback, flash };
-}
+type Tab = 'users' | 'programs' | 'events';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -60,7 +51,6 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
   const [filterProgramId, setFilterProgramId] = useState<string>('');
   const [sort, setSort] = useState<{ col: 'name' | 'status' | 'role' | 'program'; dir: 'asc' | 'desc' }>({ col: 'name', dir: 'asc' });
   const menuRef = useRef<HTMLDivElement>(null);
-  const { feedback, flash } = useFeedback();
 
   const toggleSort = (col: typeof sort.col) =>
     setSort((s) => ({ col, dir: s.col === col && s.dir === 'asc' ? 'desc' : 'asc' }));
@@ -140,7 +130,7 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, defaultProgramId }),
     });
-    if (!res.ok) flash('Failed to save. Please try again.', 'error');
+    if (!res.ok) toast.error('Failed to save. Please try again.');
     else fetchData();
     setSettingProgram(null);
   };
@@ -156,8 +146,8 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
     const data = await res.json();
     setRemoving(false);
     setConfirmRemoveEmail(null);
-    if (!res.ok) flash(data.error ?? 'Failed to remove user.', 'error');
-    else { flash(`${confirmRemoveEmail} removed.`, 'success'); fetchData(); }
+    if (!res.ok) toast.error(data.error ?? 'Failed to remove user.');
+    else { toast.success(`${confirmRemoveEmail} removed.`); fetchData(); }
   };
 
   const sendInvite = async () => {
@@ -170,12 +160,11 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
     });
     const data = await res.json();
     setInviting(false);
-    if (!res.ok) { flash(data.error ?? 'Failed to invite.', 'error'); return; }
-    flash(
+    if (!res.ok) { toast.error(data.error ?? 'Failed to invite.'); return; }
+    toast.success(
       data.emailSent
         ? `Invite sent to ${inviteEmail.trim()}`
-        : `${inviteEmail.trim()} added. (Configure SMTP to send email invites)`,
-      'success'
+        : `${inviteEmail.trim()} added. (Configure SMTP to send email invites)`
     );
     setInviteEmail('');
     setInviteRole('instructor');
@@ -219,16 +208,6 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
           Invite user
         </button>
       </div>
-
-      {feedback && (
-        <div className={`text-sm px-4 py-2.5 rounded-xl border ${
-          feedback.kind === 'success'
-            ? 'bg-green-50 text-green-700 border-green-200'
-            : 'bg-red-50 text-red-700 border-red-200'
-        }`}>
-          {feedback.text}
-        </div>
-      )}
 
       {inviteOpen && (
         <div className="bg-white border border-[#e5e5e3] rounded-xl p-4 space-y-3">
@@ -329,14 +308,45 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
       )}
 
       {loading ? (
-        <p className="text-sm text-[#888] text-center py-16">Loading…</p>
-      ) : (
-        <div className="bg-white border border-[#e5e5e3] rounded-xl overflow-hidden">
+        <div className="bg-white border border-[#e5e5e3] rounded-xl [overflow:clip]">
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#e5e5e3] bg-[#fafafa]">
+                {['Name','Status','Role','Program',''].map((h, i) => (
+                  <th key={i} className={`py-3 ${i === 0 ? 'px-5' : 'px-4'}`}>
+                    {h && <div className="h-3 w-12 rounded bg-[#e5e5e3] animate-pulse" />}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#e5e5e3]">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <tr key={i}>
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-[#e5e5e3] animate-pulse flex-shrink-0" />
+                      <div className="space-y-1.5">
+                        <div className="h-3 rounded bg-[#e5e5e3] animate-pulse" style={{ width: 80 + (i * 17) % 60 }} />
+                        <div className="h-2.5 rounded bg-[#e5e5e3] animate-pulse" style={{ width: 120 + (i * 11) % 40 }} />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3"><div className="h-5 w-14 rounded-full bg-[#e5e5e3] animate-pulse" /></td>
+                  <td className="px-4 py-3"><div className="h-5 w-20 rounded-full bg-[#e5e5e3] animate-pulse" /></td>
+                  <td className="px-4 py-3"><div className="h-7 w-36 rounded-lg bg-[#e5e5e3] animate-pulse" /></td>
+                  <td className="px-2 py-3"><div className="w-7 h-7 rounded-lg bg-[#e5e5e3] animate-pulse" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="bg-white border border-[#e5e5e3] rounded-xl [overflow:clip]">
+          <table className="w-full">
+            <thead className="sticky top-14 z-[2]">
+              <tr className="border-b border-[#e5e5e3] bg-[#fafafa]">
                 {(['name','status','role','program'] as const).map((col) => (
-                  <th key={col} className={`text-left text-[11px] font-medium text-[#888] uppercase tracking-wide py-3 ${col === 'name' ? 'px-5' : 'px-4'}`}>
+                  <th key={col} className={`text-left text-[11px] font-medium text-[#888] uppercase tracking-wide py-3 bg-[#fafafa] ${col === 'name' ? 'px-5' : 'px-4'}`}>
                     <button onClick={() => toggleSort(col)} className="flex items-center gap-1 hover:text-[#1a1a1a] transition-colors">
                       {col.charAt(0).toUpperCase() + col.slice(1)}
                       <span className={`text-[10px] ${sort.col === col ? 'text-[#1a1a1a]' : 'text-[#ccc]'}`}>
@@ -345,7 +355,7 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
                     </button>
                   </th>
                 ))}
-                <th className="w-10 px-4 py-3"></th>
+                <th className="w-10 px-4 py-3 bg-[#fafafa]"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#e5e5e3]">
@@ -430,9 +440,6 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
                             <option key={p.id} value={p.id}>{p.name}</option>
                           ))}
                         </select>
-                        {settingProgram === row.email && (
-                          <span className="text-[10px] text-[#888]">Saving…</span>
-                        )}
                       </div>
                     </td>
 
@@ -573,7 +580,6 @@ function ProgramsTab({ superAdmin }: { superAdmin: boolean }) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [sort, setSort] = useState<{ col: 'name' | 'members'; dir: 'asc' | 'desc' }>({ col: 'name', dir: 'asc' });
   const menuRef = useRef<HTMLDivElement>(null);
-  const { feedback, flash } = useFeedback();
 
   const toggleSort = (col: typeof sort.col) =>
     setSort((s) => ({ col, dir: s.col === col && s.dir === 'asc' ? 'desc' : 'asc' }));
@@ -604,8 +610,8 @@ function ProgramsTab({ superAdmin }: { superAdmin: boolean }) {
     });
     const data = await res.json();
     setAdding(false);
-    if (!res.ok) { flash(data.error ?? 'Failed to create program.', 'error'); return; }
-    flash(`"${newName.trim()}" created.`, 'success');
+    if (!res.ok) { toast.error(data.error ?? 'Failed to create program.'); return; }
+    toast.success(`"${newName.trim()}" created.`);
     setNewName('');
     setAddOpen(false);
     fetchData();
@@ -621,8 +627,8 @@ function ProgramsTab({ superAdmin }: { superAdmin: boolean }) {
     });
     const data = await res.json();
     setSavingId(null);
-    if (!res.ok) { flash(data.error ?? 'Failed to rename.', 'error'); return; }
-    flash('Program renamed.', 'success');
+    if (!res.ok) { toast.error(data.error ?? 'Failed to rename.'); return; }
+    toast.success('Program renamed.');
     setEditingId(null);
     fetchData();
   };
@@ -633,8 +639,8 @@ function ProgramsTab({ superAdmin }: { superAdmin: boolean }) {
     const res = await fetch(`/api/programs/${confirmDeleteId}`, { method: 'DELETE' });
     setDeleting(false);
     setConfirmDeleteId(null);
-    if (!res.ok) { flash('Failed to delete program.', 'error'); return; }
-    flash('Program deleted.', 'success');
+    if (!res.ok) { toast.error('Failed to delete program.'); return; }
+    toast.success('Program deleted.');
     fetchData();
   };
 
@@ -661,16 +667,6 @@ function ProgramsTab({ superAdmin }: { superAdmin: boolean }) {
           </button>
         )}
       </div>
-
-      {feedback && (
-        <div className={`text-sm px-4 py-2.5 rounded-xl border ${
-          feedback.kind === 'success'
-            ? 'bg-green-50 text-green-700 border-green-200'
-            : 'bg-red-50 text-red-700 border-red-200'
-        }`}>
-          {feedback.text}
-        </div>
-      )}
 
       {addOpen && superAdmin && (
         <div className="bg-white border border-[#e5e5e3] rounded-xl p-4 flex items-center gap-3">
@@ -707,14 +703,35 @@ function ProgramsTab({ superAdmin }: { superAdmin: boolean }) {
       )}
 
       {loading ? (
-        <p className="text-sm text-[#888] text-center py-16">Loading…</p>
-      ) : (
-        <div className="bg-white border border-[#e5e5e3] rounded-xl overflow-hidden">
+        <div className="bg-white border border-[#e5e5e3] rounded-xl [overflow:clip]">
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#e5e5e3] bg-[#fafafa]">
+                {['Program','Members',''].map((h, i) => (
+                  <th key={i} className={`py-3 ${i === 0 ? 'px-5' : 'px-4'}`}>
+                    {h && <div className="h-3 w-14 rounded bg-[#e5e5e3] animate-pulse" />}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#e5e5e3]">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <tr key={i}>
+                  <td className="px-5 py-3"><div className="h-3.5 rounded bg-[#e5e5e3] animate-pulse" style={{ width: 60 + (i * 23) % 50 }} /></td>
+                  <td className="px-4 py-3"><div className="h-5 w-20 rounded-full bg-[#e5e5e3] animate-pulse" /></td>
+                  <td className="px-2 py-3"><div className="w-7 h-7 rounded-lg bg-[#e5e5e3] animate-pulse" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="bg-white border border-[#e5e5e3] rounded-xl [overflow:clip]">
+          <table className="w-full">
+            <thead className="sticky top-14 z-[2]">
+              <tr className="border-b border-[#e5e5e3] bg-[#fafafa]">
                 {([['name','Program','px-5'],['members','Members','px-4']] as const).map(([col, label, px]) => (
-                  <th key={col} className={`text-left text-[11px] font-medium text-[#888] uppercase tracking-wide ${px} py-3`}>
+                  <th key={col} className={`text-left text-[11px] font-medium text-[#888] uppercase tracking-wide ${px} py-3 bg-[#fafafa]`}>
                     <button onClick={() => toggleSort(col)} className="flex items-center gap-1 hover:text-[#1a1a1a] transition-colors">
                       {label}
                       <span className={`text-[10px] ${sort.col === col ? 'text-[#1a1a1a]' : 'text-[#ccc]'}`}>
@@ -723,7 +740,7 @@ function ProgramsTab({ superAdmin }: { superAdmin: boolean }) {
                     </button>
                   </th>
                 ))}
-                <th className="w-10 px-4 py-3"></th>
+                <th className="w-10 px-4 py-3 bg-[#fafafa]"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#e5e5e3]">
@@ -858,6 +875,340 @@ function ProgramsTab({ superAdmin }: { superAdmin: boolean }) {
   );
 }
 
+// ─── Events tab ───────────────────────────────────────────────────────────────
+
+interface EventTypeRow {
+  code: string;
+  label: string;
+  durationMin: number;
+  durationLocked: boolean;
+}
+
+const DURATION_OPTIONS = [
+  { label: '30 min', value: 30 },
+  { label: '1 hr',   value: 60 },
+  { label: '1.5 hrs', value: 90 },
+  { label: '2 hrs',  value: 120 },
+  { label: '4 hrs',  value: 240 },
+  { label: '8 hrs',  value: 480 },
+];
+
+function EventsTab({ superAdmin }: { superAdmin: boolean }) {
+  const [events, setEvents] = useState<EventTypeRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [addOpen, setAddOpen] = useState(false);
+  const [newCode, setNewCode] = useState('');
+  const [newLabel, setNewLabel] = useState('');
+  const [newDuration, setNewDuration] = useState(30);
+  const [newLocked, setNewLocked] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const addCodeRef = useRef<HTMLInputElement>(null);
+  const [editingCode, setEditingCode] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState('');
+  const [editDuration, setEditDuration] = useState(30);
+  const [editLocked, setEditLocked] = useState(false);
+  const [savingCode, setSavingCode] = useState<string | null>(null);
+  const [confirmDeleteCode, setConfirmDeleteCode] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const fetchData = () =>
+    fetch('/api/shift-types').then((r) => r.json()).then((data) => {
+      setEvents(Array.isArray(data) ? data : []);
+      setLoading(false);
+    });
+
+  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { if (addOpen) setTimeout(() => addCodeRef.current?.focus(), 50); }, [addOpen]);
+
+  const addEvent = async () => {
+    if (!newCode.trim() || !newLabel.trim()) return;
+    setAdding(true);
+    const res = await fetch('/api/shift-types', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: newCode.trim(), label: newLabel.trim(), durationMin: newDuration, durationLocked: newLocked }),
+    });
+    const data = await res.json();
+    setAdding(false);
+    if (!res.ok) { toast.error(data.error ?? 'Failed to create event type.'); return; }
+    toast.success(`"${newCode.trim().toUpperCase()}" created.`);
+    setNewCode(''); setNewLabel(''); setNewDuration(30); setNewLocked(false); setAddOpen(false);
+    fetchData();
+  };
+
+  const startEdit = (ev: EventTypeRow) => {
+    setEditingCode(ev.code);
+    setEditLabel(ev.label);
+    setEditDuration(ev.durationMin);
+    setEditLocked(ev.durationLocked);
+  };
+
+  const saveEdit = async (code: string) => {
+    setSavingCode(code);
+    try {
+      const res = await fetch(`/api/shift-types/${encodeURIComponent(code)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: editLabel, durationMin: editDuration, durationLocked: editLocked }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error ?? 'Failed to save.'); return; }
+      toast.success('Event type updated.');
+      setEditingCode(null);
+      fetchData();
+    } catch {
+      toast.error('Network error. Please try again.');
+    } finally {
+      setSavingCode(null);
+    }
+  };
+
+  const deleteEvent = async () => {
+    if (!confirmDeleteCode) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/shift-types/${encodeURIComponent(confirmDeleteCode)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error ?? 'Failed to delete.'); return; }
+      toast.success('Event type deleted.');
+      fetchData();
+    } catch {
+      toast.error('Network error. Please try again.');
+    } finally {
+      setDeleting(false);
+      setConfirmDeleteCode(null);
+    }
+  };
+
+  const confirmDeleteName = events.find((e) => e.code === confirmDeleteCode)?.label;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-[#1a1a1a]">Event Types</p>
+          {!loading && <p className="text-[11px] text-[#888]">{events.length} type{events.length !== 1 ? 's' : ''}</p>}
+        </div>
+        {superAdmin && (
+          <button
+            onClick={() => setAddOpen((v) => !v)}
+            className="flex items-center gap-1.5 text-xs font-medium bg-[#1a1a1a] text-white rounded-lg px-3 py-1.5 hover:bg-black transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Add event type
+          </button>
+        )}
+      </div>
+
+      {addOpen && superAdmin && (
+        <div className="bg-white border border-[#e5e5e3] rounded-xl p-4 space-y-3">
+          <div className="flex gap-3 flex-wrap">
+            <div>
+              <label className="text-[11px] text-[#888] uppercase tracking-wide font-medium block mb-1.5">Code</label>
+              <input
+                ref={addCodeRef}
+                type="text"
+                value={newCode}
+                onChange={(e) => setNewCode(e.target.value.toUpperCase())}
+                onKeyDown={(e) => e.key === 'Enter' && addEvent()}
+                placeholder="e.g. MTG"
+                maxLength={8}
+                className="w-24 text-sm border border-[#e5e5e3] rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-black/10 font-mono uppercase"
+              />
+            </div>
+            <div className="flex-1 min-w-[160px]">
+              <label className="text-[11px] text-[#888] uppercase tracking-wide font-medium block mb-1.5">Label</label>
+              <input
+                type="text"
+                value={newLabel}
+                onChange={(e) => setNewLabel(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addEvent()}
+                placeholder="e.g. Team Meeting"
+                className="w-full text-sm border border-[#e5e5e3] rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-black/10"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] text-[#888] uppercase tracking-wide font-medium block mb-1.5">Duration</label>
+              <select
+                value={newDuration}
+                onChange={(e) => setNewDuration(Number(e.target.value))}
+                className="text-sm border border-[#e5e5e3] rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-black/10"
+              >
+                {DURATION_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col justify-end pb-2">
+              <label className="flex items-center gap-2 text-xs text-[#555] cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={newLocked}
+                  onChange={(e) => setNewLocked(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded"
+                />
+                Lock duration
+              </label>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={addEvent} disabled={adding || !newCode.trim() || !newLabel.trim()} className="text-sm px-4 py-2 bg-[#1a1a1a] text-white rounded-lg disabled:opacity-40 hover:bg-black transition-colors">
+              {adding ? 'Creating…' : 'Create'}
+            </button>
+            <button onClick={() => { setAddOpen(false); setNewCode(''); setNewLabel(''); setNewDuration(30); setNewLocked(false); }} className="text-sm px-4 py-2 border border-[#e5e5e3] rounded-lg text-[#888] hover:text-[#1a1a1a] hover:border-[#1a1a1a] transition-colors">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="bg-white border border-[#e5e5e3] rounded-xl [overflow:clip]">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-[#e5e5e3] bg-[#fafafa]">
+                {['Code', 'Label', 'Duration', 'Locked', ''].map((h, i) => (
+                  <th key={i} className={`py-3 ${i === 0 ? 'px-5' : 'px-4'}`}>
+                    {h && <div className="h-3 w-14 rounded bg-[#e5e5e3] animate-pulse" />}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#e5e5e3]">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <tr key={i}>
+                  <td className="px-5 py-3"><div className="h-3.5 w-10 rounded bg-[#e5e5e3] animate-pulse font-mono" /></td>
+                  <td className="px-4 py-3"><div className="h-3.5 rounded bg-[#e5e5e3] animate-pulse" style={{ width: 80 + i * 30 }} /></td>
+                  <td className="px-4 py-3"><div className="h-5 w-14 rounded-full bg-[#e5e5e3] animate-pulse" /></td>
+                  <td className="px-4 py-3"><div className="h-4 w-4 rounded bg-[#e5e5e3] animate-pulse" /></td>
+                  <td className="px-2 py-3"><div className="w-7 h-7 rounded-lg bg-[#e5e5e3] animate-pulse" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="bg-white border border-[#e5e5e3] rounded-xl [overflow:clip]">
+          <table className="w-full">
+            <thead className="sticky top-14 z-[2]">
+              <tr className="border-b border-[#e5e5e3] bg-[#fafafa]">
+                <th className="text-left text-[11px] font-medium text-[#888] uppercase tracking-wide px-5 py-3 bg-[#fafafa]">Code</th>
+                <th className="text-left text-[11px] font-medium text-[#888] uppercase tracking-wide px-4 py-3 bg-[#fafafa]">Label</th>
+                <th className="text-left text-[11px] font-medium text-[#888] uppercase tracking-wide px-4 py-3 bg-[#fafafa]">Duration</th>
+                <th className="text-left text-[11px] font-medium text-[#888] uppercase tracking-wide px-4 py-3 bg-[#fafafa]">Duration locked</th>
+                <th className="w-10 px-4 py-3 bg-[#fafafa]"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#e5e5e3]">
+              {events.length === 0 ? (
+                <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-[#888]">No event types yet.</td></tr>
+              ) : events.map((ev) => {
+                const isEditing = editingCode === ev.code;
+                return (
+                  <tr key={ev.code} className="hover:bg-[#fafafa] transition-colors">
+                    <td className="px-5 py-3">
+                      <span className="text-sm font-mono font-medium text-[#1a1a1a]">{ev.code}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {isEditing ? (
+                        <input
+                          autoFocus
+                          type="text"
+                          value={editLabel}
+                          onChange={(e) => setEditLabel(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(ev.code); if (e.key === 'Escape') setEditingCode(null); }}
+                          className="text-sm border border-[#e5e5e3] rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-black/10 w-full max-w-xs"
+                        />
+                      ) : (
+                        <span className="text-sm text-[#1a1a1a]">{ev.label}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {isEditing ? (
+                        <select
+                          value={editDuration}
+                          onChange={(e) => setEditDuration(Number(e.target.value))}
+                          className="text-xs border border-[#e5e5e3] rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-black/10"
+                        >
+                          {DURATION_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                      ) : (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full border bg-gray-100 text-[#888] border-[#e5e5e3]">
+                          {DURATION_OPTIONS.find((o) => o.value === ev.durationMin)?.label ?? `${ev.durationMin} min`}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {isEditing ? (
+                        <label className="flex items-center gap-2 text-xs text-[#555] cursor-pointer select-none">
+                          <input type="checkbox" checked={editLocked} onChange={(e) => setEditLocked(e.target.checked)} className="w-3.5 h-3.5 rounded" />
+                          Locked
+                        </label>
+                      ) : (
+                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${
+                          ev.durationLocked
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : 'bg-gray-100 text-[#888] border-[#e5e5e3]'
+                        }`}>
+                          {ev.durationLocked ? 'Locked' : 'Flexible'}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-2 py-3">
+                      {superAdmin && (
+                        isEditing ? (
+                          <div className="flex gap-1.5">
+                            <button onClick={() => saveEdit(ev.code)} disabled={savingCode === ev.code} className="text-xs px-2.5 py-1.5 bg-[#1a1a1a] text-white rounded-lg disabled:opacity-40 hover:bg-black transition-colors">
+                              {savingCode === ev.code ? '…' : 'Save'}
+                            </button>
+                            <button onClick={() => setEditingCode(null)} className="text-xs px-2.5 py-1.5 border border-[#e5e5e3] rounded-lg text-[#888] hover:text-[#1a1a1a] transition-colors">
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-1 justify-center">
+                            <button onClick={() => startEdit(ev)} className="w-7 h-7 flex items-center justify-center rounded-lg text-[#aaa] hover:text-[#1a1a1a] hover:bg-gray-100 transition-colors" title="Edit">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <button onClick={() => setConfirmDeleteCode(ev.code)} className="w-7 h-7 flex items-center justify-center rounded-lg text-[#aaa] hover:text-red-600 hover:bg-red-50 transition-colors" title="Delete">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        )
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {confirmDeleteCode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-2xl shadow-xl border border-[#e5e5e3] p-6 max-w-sm w-full mx-4">
+            <h2 className="text-sm font-semibold text-[#1a1a1a] mb-1">Delete event type?</h2>
+            <p className="text-xs text-[#888] mb-5">
+              <span className="font-medium text-[#1a1a1a]">{confirmDeleteCode} — {confirmDeleteName}</span> will be permanently deleted. This will fail if any shifts currently use this type.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setConfirmDeleteCode(null)} disabled={deleting} className="text-sm px-4 py-2 border border-[#e5e5e3] rounded-lg text-[#888] hover:text-[#1a1a1a] hover:border-[#1a1a1a] transition-colors">Cancel</button>
+              <button onClick={deleteEvent} disabled={deleting} className="text-sm px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-40">
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Shell ────────────────────────────────────────────────────────────────────
 
 export function SettingsPage() {
@@ -870,6 +1221,7 @@ export function SettingsPage() {
   const tabs: { id: Tab; label: string }[] = [
     { id: 'users', label: 'Users' },
     { id: 'programs', label: 'Programs' },
+    { id: 'events', label: 'Events' },
   ];
 
   return (
@@ -914,6 +1266,9 @@ export function SettingsPage() {
           )}
           {tab === 'programs' && (
             <ProgramsTab superAdmin={superAdmin} />
+          )}
+          {tab === 'events' && (
+            <EventsTab superAdmin={superAdmin} />
           )}
         </div>
       </div>
