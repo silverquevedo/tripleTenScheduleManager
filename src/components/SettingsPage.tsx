@@ -395,6 +395,7 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
                 const isMenuOpen = openMenuEmail === row.email;
                 const isRegistered = row.kind === 'active';
                 const isDraft = row.kind === 'pending' && !row.isActive;
+                const isPending = row.kind === 'pending' && row.isActive;
                 const isRowManager = row.isManager;
                 const isInstructor = row.kind === 'active' && !row.isAdmin;
                 const isPendingRegular = row.kind === 'pending' && !row.isManager && !row.isLeadInstructor;
@@ -496,13 +497,13 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
                           </button>
                           {isMenuOpen && (
                             <div className="absolute right-0 top-8 z-20 bg-white border border-[#e5e5e3] rounded-xl shadow-lg py-1 min-w-[180px]">
-                              {/* Draft user — only action is to send invite */}
-                              {isDraft && (
+                              {/* Draft → activate access; Pending → resend email */}
+                              {(isDraft || isPending) && (
                                 <button
                                   onClick={() => sendInviteToUser(row.email)}
                                   className="w-full text-left text-xs px-3 py-2 hover:bg-[#f5f5f4] transition-colors text-[#1a1a1a]"
                                 >
-                                  Send invite
+                                  {isDraft ? 'Send invite' : 'Resend invite'}
                                 </button>
                               )}
                               {/* Registered user role options */}
