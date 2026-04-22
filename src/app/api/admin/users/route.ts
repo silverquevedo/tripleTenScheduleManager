@@ -148,11 +148,11 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'Cannot remove yourself' }, { status: 400 });
   }
 
-  // Lead instructors can only remove instructors (non-admins)
+  // Lead instructors can only remove regular instructors (not lead instructors or managers)
   if (!session.user?.isManager) {
-    const targetIsAdmin = await isAdmin(email);
-    if (targetIsAdmin) {
-      return NextResponse.json({ error: 'Only managers can remove admins' }, { status: 403 });
+    const record = await prisma.adminEmail.findUnique({ where: { email } });
+    if (record && (record.isLeadInstructor || record.isManager)) {
+      return NextResponse.json({ error: 'Only managers can remove lead instructors or managers' }, { status: 403 });
     }
   }
 

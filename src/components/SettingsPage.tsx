@@ -397,7 +397,8 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
                 const isDraft = row.kind === 'pending' && !row.isActive;
                 const isRowManager = row.isManager;
                 const isInstructor = row.kind === 'active' && !row.isAdmin;
-                const showMenu = !isSelf && (superAdmin || isInstructor);
+                const isPendingRegular = row.kind === 'pending' && !row.isManager && !row.isLeadInstructor;
+                const showMenu = !isSelf && (superAdmin || isInstructor || isPendingRegular);
 
                 return (
                   <tr key={row.email} className="hover:bg-[#fafafa] transition-colors">
