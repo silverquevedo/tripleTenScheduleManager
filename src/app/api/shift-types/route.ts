@@ -9,8 +9,13 @@ export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const types = await prisma.shiftType.findMany({ orderBy: { code: 'asc' } });
-  return NextResponse.json(types);
+  const [types, counts] = await Promise.all([
+    prisma.shiftType.findMany({ orderBy: { code: 'asc' } }),
+    prisma.shift.groupBy({ by: ['taskCode'], _count: { _all: true } }),
+  ]);
+  const countMap = new Map(counts.map((c) => [c.taskCode, c._count._all]));
+  const result = types.map((t) => ({ ...t, shiftCount: countMap.get(t.code) ?? 0 }));
+  return NextResponse.json(result);
 }
 
 export async function POST(request: Request) {

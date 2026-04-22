@@ -921,6 +921,7 @@ interface EventTypeRow {
   label: string;
   durationMin: number;
   durationLocked: boolean;
+  shiftCount: number;
 }
 
 const DURATION_OPTIONS = [
@@ -1109,7 +1110,7 @@ function EventsTab({ superAdmin }: { superAdmin: boolean }) {
           <table className="w-full">
             <thead className="overflow-hidden rounded-t-xl">
               <tr className="border-b border-[#e5e5e3] bg-[#fafafa]">
-                {['Code', 'Label', 'Duration', 'Locked', ''].map((h, i) => (
+                {['Code', 'Label', 'Duration', 'Locked', 'In use', ''].map((h, i) => (
                   <th key={i} className={`py-3 ${i === 0 ? 'px-5' : 'px-4'}`}>
                     {h && <div className="h-3 w-14 rounded bg-[#e5e5e3] animate-pulse" />}
                   </th>
@@ -1123,6 +1124,7 @@ function EventsTab({ superAdmin }: { superAdmin: boolean }) {
                   <td className="px-4 py-3"><div className="h-3.5 rounded bg-[#e5e5e3] animate-pulse" style={{ width: 80 + i * 30 }} /></td>
                   <td className="px-4 py-3"><div className="h-5 w-14 rounded-full bg-[#e5e5e3] animate-pulse" /></td>
                   <td className="px-4 py-3"><div className="h-4 w-4 rounded bg-[#e5e5e3] animate-pulse" /></td>
+                  <td className="px-4 py-3"><div className="h-5 w-8 rounded-full bg-[#e5e5e3] animate-pulse" /></td>
                   <td className="px-2 py-3"><div className="w-7 h-7 rounded-lg bg-[#e5e5e3] animate-pulse" /></td>
                 </tr>
               ))}
@@ -1138,12 +1140,13 @@ function EventsTab({ superAdmin }: { superAdmin: boolean }) {
                 <th className="text-left text-[11px] font-medium text-[#888] uppercase tracking-wide px-4 py-3 bg-[#fafafa]">Label</th>
                 <th className="text-left text-[11px] font-medium text-[#888] uppercase tracking-wide px-4 py-3 bg-[#fafafa]">Duration</th>
                 <th className="text-left text-[11px] font-medium text-[#888] uppercase tracking-wide px-4 py-3 bg-[#fafafa]">Duration locked</th>
+                <th className="text-left text-[11px] font-medium text-[#888] uppercase tracking-wide px-4 py-3 bg-[#fafafa]">In use</th>
                 <th className="w-10 px-4 py-3 bg-[#fafafa]"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#e5e5e3]">
               {events.length === 0 ? (
-                <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-[#888]">No event types yet.</td></tr>
+                <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-[#888]">No event types yet.</td></tr>
               ) : events.map((ev) => {
                 const isEditing = editingCode === ev.code;
                 return (
@@ -1207,6 +1210,15 @@ function EventsTab({ superAdmin }: { superAdmin: boolean }) {
                         </span>
                       )}
                     </td>
+                    <td className="px-4 py-3">
+                      {ev.shiftCount > 0 ? (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full border bg-blue-50 text-blue-700 border-blue-200">
+                          {ev.shiftCount} shift{ev.shiftCount !== 1 ? 's' : ''}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-[#ccc]">—</span>
+                      )}
+                    </td>
                     <td className="px-2 py-3">
                       {superAdmin && (
                         isEditing ? (
@@ -1225,7 +1237,16 @@ function EventsTab({ superAdmin }: { superAdmin: boolean }) {
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                               </svg>
                             </button>
-                            <button onClick={() => setConfirmDeleteCode(ev.code)} className="w-7 h-7 flex items-center justify-center rounded-lg text-[#aaa] hover:text-red-600 hover:bg-red-50 transition-colors" title="Delete">
+                            <button
+                              onClick={() => ev.shiftCount === 0 && setConfirmDeleteCode(ev.code)}
+                              disabled={ev.shiftCount > 0}
+                              title={ev.shiftCount > 0 ? `In use by ${ev.shiftCount} shift${ev.shiftCount !== 1 ? 's' : ''} — remove them first` : 'Delete'}
+                              className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${
+                                ev.shiftCount > 0
+                                  ? 'text-[#ddd] cursor-not-allowed'
+                                  : 'text-[#aaa] hover:text-red-600 hover:bg-red-50'
+                              }`}
+                            >
                               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                               </svg>
@@ -1247,7 +1268,7 @@ function EventsTab({ superAdmin }: { superAdmin: boolean }) {
           <div className="bg-white rounded-2xl shadow-xl border border-[#e5e5e3] p-6 max-w-sm w-full mx-4">
             <h2 className="text-sm font-semibold text-[#1a1a1a] mb-1">Delete event type?</h2>
             <p className="text-xs text-[#888] mb-5">
-              <span className="font-medium text-[#1a1a1a]">{confirmDeleteCode} — {confirmDeleteName}</span> will be permanently deleted. This will fail if any shifts currently use this type.
+              <span className="font-medium text-[#1a1a1a]">{confirmDeleteCode} — {confirmDeleteName}</span> will be permanently deleted. This cannot be undone.
             </p>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setConfirmDeleteCode(null)} disabled={deleting} className="text-sm px-4 py-2 border border-[#e5e5e3] rounded-lg text-[#888] hover:text-[#1a1a1a] hover:border-[#1a1a1a] transition-colors">Cancel</button>
