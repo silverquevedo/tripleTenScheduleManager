@@ -348,7 +348,7 @@ export function ScheduleTable({
 
       {/* ── Fullscreen overlay ── */}
       {fullscreen && (
-        <div className="fixed inset-0 z-30 bg-[#f9f9f8] flex flex-col">
+        <div className="fixed inset-0 z-[200] bg-[#f9f9f8] flex flex-col">
           <div className="sticky top-0 bg-white border-b border-[#e5e5e3] px-5 py-3 flex items-center justify-between z-10 flex-shrink-0">
             <div className="flex items-center gap-3">
               <h2 className="text-sm font-semibold text-[#1a1a1a]">Weekly Schedule</h2>
@@ -373,7 +373,7 @@ export function ScheduleTable({
             </button>
             </div>
           </div>
-          <div className="flex-1 overflow-auto p-5">{tableGrid}</div>
+          <div className="flex-1 overflow-auto px-5 pb-5">{tableGrid}</div>
         </div>
       )}
 
