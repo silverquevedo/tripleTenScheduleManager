@@ -39,7 +39,7 @@ export async function GET() {
       name: u.name,
       email: u.email,
       image: u.image,
-      isAdmin: !!record,
+      isAdmin: !!record && (record.isLeadInstructor || record.isManager),
       isManager: record?.isManager ?? false,
       defaultProgramId: u.defaultProgramId ?? null,
     };
