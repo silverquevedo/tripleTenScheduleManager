@@ -20,11 +20,12 @@ const DURATION_OPTIONS = [
 ];
 
 function minsToTime(m: number) {
-  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  const w = m % (24 * 60);
+  return `${String(Math.floor(w / 60)).padStart(2, '0')}:${String(w % 60).padStart(2, '0')}`;
 }
 
 function startOptions(duration: number) {
-  const maxStart = 1440 - duration;
+  const maxStart = 1560 - duration; // window ends at 02:00 (1560 min)
   const count = Math.floor((maxStart - 480) / 30) + 1;
   return Array.from({ length: count }, (_, i) => 480 + i * 30);
 }
