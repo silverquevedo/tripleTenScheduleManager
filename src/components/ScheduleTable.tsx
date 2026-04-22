@@ -205,8 +205,8 @@ export function ScheduleTable({
                         className="group inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-white font-medium whitespace-nowrap"
                         style={{ backgroundColor: colorOf(s.memberName), fontSize: '10px' }}
                       >
-                        <strong>{s.memberName.split(' ')[0]}</strong>
-                        <span className="opacity-75 mx-0.5">{s.taskCode}</span>
+                        <span className="opacity-90">{s.memberName.split(' ')[0]}</span>
+                        <strong className="mx-0.5">{s.taskCode}</strong>
                         {isAdmin && (
                           <button
                             onClick={() => handleDeleteShift(s)}
@@ -237,8 +237,8 @@ export function ScheduleTable({
                         className="group inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-white font-medium whitespace-nowrap"
                         style={{ backgroundColor: m.color, fontSize: '10px' }}
                       >
-                        <strong>{s.memberName.split(' ')[0]}</strong>
-                        <span className="opacity-75 mx-0.5">{s.taskCode}</span>
+                        <span className="opacity-90">{s.memberName.split(' ')[0]}</span>
+                        <strong className="mx-0.5">{s.taskCode}</strong>
                         {isAdmin && (
                           <button
                             onClick={() => handleDeleteShift(s)}
