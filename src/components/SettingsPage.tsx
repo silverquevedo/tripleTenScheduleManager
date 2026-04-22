@@ -1237,20 +1237,29 @@ function EventsTab({ superAdmin }: { superAdmin: boolean }) {
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                               </svg>
                             </button>
-                            <button
-                              onClick={() => ev.shiftCount === 0 && setConfirmDeleteCode(ev.code)}
-                              disabled={ev.shiftCount > 0}
-                              title={ev.shiftCount > 0 ? `In use by ${ev.shiftCount} shift${ev.shiftCount !== 1 ? 's' : ''} — remove them first` : 'Delete'}
-                              className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${
-                                ev.shiftCount > 0
-                                  ? 'text-[#ddd] cursor-not-allowed'
-                                  : 'text-[#aaa] hover:text-red-600 hover:bg-red-50'
-                              }`}
-                            >
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
+                            <div className="relative group">
+                              <button
+                                onClick={() => ev.shiftCount === 0 && setConfirmDeleteCode(ev.code)}
+                                disabled={ev.shiftCount > 0}
+                                className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${
+                                  ev.shiftCount > 0
+                                    ? 'text-[#ddd] cursor-not-allowed'
+                                    : 'text-[#aaa] hover:text-red-600 hover:bg-red-50'
+                                }`}
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                              {ev.shiftCount > 0 && (
+                                <div className="pointer-events-none absolute bottom-full right-0 mb-1.5 hidden group-hover:flex whitespace-nowrap">
+                                  <span className="bg-[#1a1a1a] text-white text-[10px] font-medium px-2 py-1 rounded-lg shadow-md">
+                                    In use by {ev.shiftCount} shift{ev.shiftCount !== 1 ? 's' : ''}
+                                  </span>
+                                  <span className="absolute top-full right-2.5 -translate-x-1/2 border-4 border-transparent border-t-[#1a1a1a]" />
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )
                       )}
