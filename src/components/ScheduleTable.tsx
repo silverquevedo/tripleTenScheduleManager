@@ -261,7 +261,7 @@ export function ScheduleTable({
   );
 
   const tableGrid = (
-    <table className="border-separate border-spacing-0">
+    <table className="border-separate border-spacing-0 w-full">
         <thead className="sticky top-0 z-[1]">
           <tr>
             <th className="text-left py-2 px-3 text-[11px] font-medium text-[#888] w-14 border-b border-[#e5e5e3] bg-white">
@@ -269,7 +269,7 @@ export function ScheduleTable({
             </th>
             {DAYS.map((d, i) => (
               <th key={d}
-                className="text-left py-2 px-2 text-[11px] font-medium text-[#888] border-b border-[#e5e5e3] min-w-[96px] bg-white">
+                className="text-left py-2 px-2 text-[11px] font-medium text-[#888] border-b border-[#e5e5e3] bg-white w-[calc((100%-3.5rem)/7)]">
                 <span className="hidden lg:inline">{d}</span>
                 <span className="lg:hidden">{DAYS_SHORT[i]}</span>
               </th>
