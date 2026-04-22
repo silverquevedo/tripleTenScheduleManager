@@ -339,9 +339,9 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
       )}
 
       {loading ? (
-        <div className="bg-white border border-[#e5e5e3] rounded-xl [overflow:clip]">
+        <div className="bg-white border border-[#e5e5e3] rounded-xl">
           <table className="w-full">
-            <thead>
+            <thead className="overflow-hidden rounded-t-xl">
               <tr className="border-b border-[#e5e5e3] bg-[#fafafa]">
                 {['Name','Status','Role','Program',''].map((h, i) => (
                   <th key={i} className={`py-3 ${i === 0 ? 'px-5' : 'px-4'}`}>
@@ -372,9 +372,9 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
           </table>
         </div>
       ) : (
-        <div className="bg-white border border-[#e5e5e3] rounded-xl [overflow:clip]">
+        <div className="bg-white border border-[#e5e5e3] rounded-xl">
           <table className="w-full">
-            <thead className="sticky top-14 z-[2]">
+            <thead className="sticky top-14 z-[2] overflow-hidden rounded-t-xl">
               <tr className="border-b border-[#e5e5e3] bg-[#fafafa]">
                 {(['name','status','role','program'] as const).map((col) => (
                   <th key={col} className={`text-left text-[11px] font-medium text-[#888] uppercase tracking-wide py-3 bg-[#fafafa] ${col === 'name' ? 'px-5' : 'px-4'}`}>
@@ -742,9 +742,9 @@ function ProgramsTab({ superAdmin }: { superAdmin: boolean }) {
       )}
 
       {loading ? (
-        <div className="bg-white border border-[#e5e5e3] rounded-xl [overflow:clip]">
+        <div className="bg-white border border-[#e5e5e3] rounded-xl">
           <table className="w-full">
-            <thead>
+            <thead className="overflow-hidden rounded-t-xl">
               <tr className="border-b border-[#e5e5e3] bg-[#fafafa]">
                 {['Program','Members',''].map((h, i) => (
                   <th key={i} className={`py-3 ${i === 0 ? 'px-5' : 'px-4'}`}>
@@ -765,9 +765,9 @@ function ProgramsTab({ superAdmin }: { superAdmin: boolean }) {
           </table>
         </div>
       ) : (
-        <div className="bg-white border border-[#e5e5e3] rounded-xl [overflow:clip]">
+        <div className="bg-white border border-[#e5e5e3] rounded-xl">
           <table className="w-full">
-            <thead className="sticky top-14 z-[2]">
+            <thead className="sticky top-14 z-[2] overflow-hidden rounded-t-xl">
               <tr className="border-b border-[#e5e5e3] bg-[#fafafa]">
                 {([['name','Program','px-5'],['members','Members','px-4']] as const).map(([col, label, px]) => (
                   <th key={col} className={`text-left text-[11px] font-medium text-[#888] uppercase tracking-wide ${px} py-3 bg-[#fafafa]`}>
@@ -1105,9 +1105,9 @@ function EventsTab({ superAdmin }: { superAdmin: boolean }) {
       )}
 
       {loading ? (
-        <div className="bg-white border border-[#e5e5e3] rounded-xl [overflow:clip]">
+        <div className="bg-white border border-[#e5e5e3] rounded-xl">
           <table className="w-full">
-            <thead>
+            <thead className="overflow-hidden rounded-t-xl">
               <tr className="border-b border-[#e5e5e3] bg-[#fafafa]">
                 {['Code', 'Label', 'Duration', 'Locked', ''].map((h, i) => (
                   <th key={i} className={`py-3 ${i === 0 ? 'px-5' : 'px-4'}`}>
@@ -1130,9 +1130,9 @@ function EventsTab({ superAdmin }: { superAdmin: boolean }) {
           </table>
         </div>
       ) : (
-        <div className="bg-white border border-[#e5e5e3] rounded-xl [overflow:clip]">
+        <div className="bg-white border border-[#e5e5e3] rounded-xl">
           <table className="w-full">
-            <thead className="sticky top-14 z-[2]">
+            <thead className="sticky top-14 z-[2] overflow-hidden rounded-t-xl">
               <tr className="border-b border-[#e5e5e3] bg-[#fafafa]">
                 <th className="text-left text-[11px] font-medium text-[#888] uppercase tracking-wide px-5 py-3 bg-[#fafafa]">Code</th>
                 <th className="text-left text-[11px] font-medium text-[#888] uppercase tracking-wide px-4 py-3 bg-[#fafafa]">Label</th>
