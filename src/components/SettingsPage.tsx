@@ -889,6 +889,7 @@ const DURATION_OPTIONS = [
   { label: '1 hr',   value: 60 },
   { label: '1.5 hrs', value: 90 },
   { label: '2 hrs',  value: 120 },
+  { label: '3 hrs',  value: 180 },
   { label: '4 hrs',  value: 240 },
   { label: '8 hrs',  value: 480 },
 ];
@@ -904,6 +905,7 @@ function EventsTab({ superAdmin }: { superAdmin: boolean }) {
   const [adding, setAdding] = useState(false);
   const addCodeRef = useRef<HTMLInputElement>(null);
   const [editingCode, setEditingCode] = useState<string | null>(null);
+  const [editCode, setEditCode] = useState('');
   const [editLabel, setEditLabel] = useState('');
   const [editDuration, setEditDuration] = useState(30);
   const [editLocked, setEditLocked] = useState(false);
@@ -938,6 +940,7 @@ function EventsTab({ superAdmin }: { superAdmin: boolean }) {
 
   const startEdit = (ev: EventTypeRow) => {
     setEditingCode(ev.code);
+    setEditCode(ev.code);
     setEditLabel(ev.label);
     setEditDuration(ev.durationMin);
     setEditLocked(ev.durationLocked);
@@ -949,7 +952,7 @@ function EventsTab({ superAdmin }: { superAdmin: boolean }) {
       const res = await fetch(`/api/shift-types/${encodeURIComponent(code)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: editLabel, durationMin: editDuration, durationLocked: editLocked }),
+        body: JSON.stringify({ code: editCode, label: editLabel, durationMin: editDuration, durationLocked: editLocked }),
       });
       const data = await res.json();
       if (!res.ok) { toast.error(data.error ?? 'Failed to save.'); return; }
@@ -1107,7 +1110,18 @@ function EventsTab({ superAdmin }: { superAdmin: boolean }) {
                 return (
                   <tr key={ev.code} className="hover:bg-[#fafafa] transition-colors">
                     <td className="px-5 py-3">
-                      <span className="text-sm font-mono font-medium text-[#1a1a1a]">{ev.code}</span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editCode}
+                          onChange={(e) => setEditCode(e.target.value.toUpperCase())}
+                          onKeyDown={(e) => { if (e.key === 'Escape') setEditingCode(null); }}
+                          maxLength={8}
+                          className="w-20 text-sm border border-[#e5e5e3] rounded-lg px-2 py-1.5 font-mono uppercase focus:outline-none focus:ring-2 focus:ring-black/10"
+                        />
+                      ) : (
+                        <span className="text-sm font-mono font-medium text-[#1a1a1a]">{ev.code}</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {isEditing ? (
