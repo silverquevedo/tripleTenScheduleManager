@@ -11,7 +11,28 @@
       "Bash(kill 21251)",
       "Bash(npm install:*)",
       "Bash(npx tsx:*)",
-      "Bash(pkill -f \"next dev\")"
+      "Bash(pkill -f \"next dev\")",
+      "Read(//Users/andres.quevedo/Desktop/**)",
+      "Bash(npx create-next-app@latest encontrandoelmodo --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-git)",
+      "Bash(node -e \"const l = require\\('lucide-react'\\); const keys = Object.keys\\(l\\); console.log\\(keys.filter\\(k => k.toLowerCase\\(\\).includes\\('instagram'\\) || k.toLowerCase\\(\\).includes\\('camera'\\) || k.toLowerCase\\(\\).includes\\('share'\\)\\).join\\(', '\\)\\)\")",
+      "Bash(PORT=3001 npx next dev --port 3001)",
+      "Bash(PORT=3001 npx next dev -p 3001)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3001/)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_in_Chrome__navigate",
+      "mcp__Claude_in_Chrome__computer",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(gh auth:*)",
+      "Bash(gh repo:*)",
+      "Bash(git push:*)",
+      "Bash(openssl rand:*)",
+      "Bash(git -C /Users/andres.quevedo/Desktop/encontrandoelmodo log --oneline -5)",
+      "Bash(git -C /Users/andres.quevedo/Desktop/encontrandoelmodo remote -v)",
+      "Bash(git -C /Users/andres.quevedo/Desktop/encontrandoelmodo add src/lib/email.ts src/app/api/bookings/route.ts src/app/api/stripe/webhook/route.ts src/app/book/checkout/page.tsx)",
+      "Bash(git -C /Users/andres.quevedo/Desktop/encontrandoelmodo commit -m ':*)",
+      "Bash(git -C /Users/andres.quevedo/Desktop/encontrandoelmodo push)",
+      "Bash(git -C /Users/andres.quevedo/Desktop/encontrandoelmodo status)"
     ]
   }
 }

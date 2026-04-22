@@ -52,6 +52,7 @@ export async function GET() {
       defaultProgramId: a.defaultProgramId ?? null,
       isManager: a.isManager,
       isLeadInstructor: a.isLeadInstructor,
+      isActive: a.isActive,
     }));
 
   return NextResponse.json({ registeredUsers, pendingAdmins });
@@ -64,8 +65,14 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const { email, grant, grantManager, defaultProgramId } = await request.json();
+  const { email, grant, grantManager, defaultProgramId, sendInvite } = await request.json();
   if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 });
+
+  // Activate a draft user (send invite)
+  if (sendInvite === true) {
+    await prisma.adminEmail.updateMany({ where: { email }, data: { isActive: true } });
+    return NextResponse.json({ success: true });
+  }
 
   // Update default program — any admin can do this
   if (defaultProgramId !== undefined) {

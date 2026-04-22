@@ -26,6 +26,7 @@ interface PendingUser {
   email: string;
   isManager: boolean;
   isLeadInstructor: boolean;
+  isActive: boolean;
   defaultProgramId: string | null;
 }
 
@@ -69,6 +70,7 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'instructor' | 'leadInstructor' | 'manager'>('instructor');
   const [inviteProgramId, setInviteProgramId] = useState<string>('');
+  const [inviteSendNow, setInviteSendNow] = useState(true);
   const [inviting, setInviting] = useState(false);
   const inviteInputRef = useRef<HTMLInputElement>(null);
 
@@ -81,7 +83,7 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
         (u: Omit<ActiveUser, 'kind'>) => ({ kind: 'active' as const, ...u })
       );
       const pending: PendingUser[] = (pendingAdmins ?? []).map(
-        (p: { email: string; defaultProgramId: string | null; isManager: boolean; isLeadInstructor: boolean }) => ({ kind: 'pending' as const, ...p })
+        (p: { email: string; defaultProgramId: string | null; isManager: boolean; isLeadInstructor: boolean; isActive: boolean }) => ({ kind: 'pending' as const, ...p })
       );
       setRows([...active, ...pending]);
       setPrograms(Array.isArray(progs) ? progs : []);
@@ -156,21 +158,35 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
     const res = await fetch('/api/admin/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole, programId: inviteProgramId || undefined }),
+      body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole, programId: inviteProgramId || undefined, sendInvite: inviteSendNow }),
     });
     const data = await res.json();
     setInviting(false);
-    if (!res.ok) { toast.error(data.error ?? 'Failed to invite.'); return; }
+    if (!res.ok) { toast.error(data.error ?? 'Failed to add.'); return; }
     toast.success(
-      data.emailSent
-        ? `Invite sent to ${inviteEmail.trim()}`
-        : `${inviteEmail.trim()} added. (Configure SMTP to send email invites)`
+      inviteSendNow
+        ? (data.emailSent ? `Invite sent to ${inviteEmail.trim()}` : `${inviteEmail.trim()} added with access.`)
+        : `${inviteEmail.trim()} added as draft.`
     );
     setInviteEmail('');
     setInviteRole('instructor');
     setInviteProgramId('');
+    setInviteSendNow(true);
     setInviteOpen(false);
     fetchData();
+  };
+
+  const sendInviteToUser = async (email: string) => {
+    setToggling(email);
+    setOpenMenuEmail(null);
+    await fetch('/api/admin/users', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, sendInvite: true }),
+    });
+    toast.success(`Access granted to ${email}.`);
+    fetchData();
+    setToggling(null);
   };
 
   const activeCount = rows.filter((r) => r.kind === 'active').length;
@@ -264,16 +280,31 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
             </div>
           </div>
 
+          {/* Send invite toggle */}
+          <label className="flex items-center gap-2.5 text-xs text-[#555] cursor-pointer select-none w-fit">
+            <input
+              type="checkbox"
+              checked={inviteSendNow}
+              onChange={(e) => setInviteSendNow(e.target.checked)}
+              className="w-3.5 h-3.5 rounded"
+            />
+            <span>
+              {inviteSendNow
+                ? 'Give access now (can sign in immediately)'
+                : 'Draft only — add to schedule without access'}
+            </span>
+          </label>
+
           <div className="flex gap-2">
             <button
               onClick={sendInvite}
               disabled={inviting || !inviteEmail.trim()}
               className="text-sm px-4 py-2 bg-[#1a1a1a] text-white rounded-lg disabled:opacity-40 hover:bg-black transition-colors"
             >
-              {inviting ? 'Sending…' : 'Send invite'}
+              {inviting ? 'Adding…' : inviteSendNow ? 'Send invite' : 'Add as draft'}
             </button>
             <button
-              onClick={() => { setInviteOpen(false); setInviteEmail(''); setInviteRole('instructor'); setInviteProgramId(''); }}
+              onClick={() => { setInviteOpen(false); setInviteEmail(''); setInviteRole('instructor'); setInviteProgramId(''); setInviteSendNow(true); }}
               className="text-sm px-4 py-2 border border-[#e5e5e3] rounded-lg text-[#888] hover:text-[#1a1a1a] hover:border-[#1a1a1a] transition-colors"
             >
               Cancel
@@ -362,7 +393,8 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
               {sortedRows.map((row) => {
                 const isSelf = row.kind === 'active' && row.email === currentEmail;
                 const isMenuOpen = openMenuEmail === row.email;
-                const isActive = row.kind === 'active';
+                const isRegistered = row.kind === 'active';
+                const isDraft = row.kind === 'pending' && !row.isActive;
                 const isRowManager = row.isManager;
                 const isInstructor = row.kind === 'active' && !row.isAdmin;
                 const showMenu = !isSelf && (superAdmin || isInstructor);
@@ -398,9 +430,13 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
                     </td>
 
                     <td className="px-4 py-3">
-                      {row.kind === 'active' ? (
+                      {isRegistered ? (
                         <span className="text-[10px] font-medium px-2 py-0.5 rounded-full border bg-green-50 text-green-700 border-green-200">
                           Active
+                        </span>
+                      ) : isDraft ? (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full border bg-gray-100 text-[#888] border-[#e5e5e3]">
+                          Draft
                         </span>
                       ) : (
                         <span className="text-[10px] font-medium px-2 py-0.5 rounded-full border bg-amber-50 text-amber-700 border-amber-200">
@@ -419,7 +455,7 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
                       }`}>
                         {isRowManager
                           ? 'Manager'
-                          : row.kind === 'active'
+                          : isRegistered
                             ? (row.isAdmin ? 'Lead Instructor' : 'Instructor')
                             : row.isLeadInstructor
                               ? 'Lead Instructor'
@@ -459,8 +495,17 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
                           </button>
                           {isMenuOpen && (
                             <div className="absolute right-0 top-8 z-20 bg-white border border-[#e5e5e3] rounded-xl shadow-lg py-1 min-w-[180px]">
-                              {/* Manager options */}
-                              {superAdmin && isActive && isRowManager && (
+                              {/* Draft user — only action is to send invite */}
+                              {isDraft && (
+                                <button
+                                  onClick={() => sendInviteToUser(row.email)}
+                                  className="w-full text-left text-xs px-3 py-2 hover:bg-[#f5f5f4] transition-colors text-[#1a1a1a]"
+                                >
+                                  Send invite
+                                </button>
+                              )}
+                              {/* Registered user role options */}
+                              {superAdmin && isRegistered && isRowManager && (
                                 <button
                                   onClick={() => toggleManager(row.email, false)}
                                   className="w-full text-left text-xs px-3 py-2 hover:bg-[#f5f5f4] transition-colors text-[#1a1a1a]"
@@ -468,7 +513,7 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
                                   Revoke manager
                                 </button>
                               )}
-                              {superAdmin && isActive && !isRowManager && row.isAdmin && (
+                              {superAdmin && isRegistered && !isRowManager && row.isAdmin && (
                                 <>
                                   <button
                                     onClick={() => toggleAdmin(row.email, false)}
@@ -484,7 +529,7 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
                                   </button>
                                 </>
                               )}
-                              {superAdmin && isActive && isInstructor && (
+                              {superAdmin && isRegistered && isInstructor && (
                                 <>
                                   <button
                                     onClick={() => toggleAdmin(row.email, true)}
@@ -499,14 +544,6 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
                                     Make manager
                                   </button>
                                 </>
-                              )}
-                              {superAdmin && !isActive && (
-                                <button
-                                  onClick={() => toggleManager(row.email, true)}
-                                  className="w-full text-left text-xs px-3 py-2 hover:bg-[#f5f5f4] transition-colors text-[#1a1a1a]"
-                                >
-                                  Make manager
-                                </button>
                               )}
                               <button
                                 onClick={() => { setOpenMenuEmail(null); setConfirmRemoveEmail(row.email); }}

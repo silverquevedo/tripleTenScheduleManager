@@ -89,4 +89,5 @@ model AdminEmail {
   isManager        Boolean @default(false)
   isLeadInstructor Boolean @default(true)
   color            String?
+  isActive         Boolean @default(true)
 }

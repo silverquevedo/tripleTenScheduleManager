@@ -28,11 +28,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const { email, role = 'instructor', programId } = await request.json() as {
+  const { email, role = 'instructor', programId, sendInvite = true } = await request.json() as {
     email: string;
     role?: InviteRole;
     programId?: string;
+    sendInvite?: boolean;
   };
+  const isActive = Boolean(sendInvite);
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: 'Valid email required' }, { status: 400 });
@@ -46,14 +48,12 @@ export async function POST(request: Request) {
   const defaultProgramId = programId || null;
 
   if (role === 'instructor') {
-    // Track in AdminEmail as non-lead, non-manager (shows as pending instructor)
     const color = defaultProgramId ? await assignColor(defaultProgramId) : null;
     await prisma.adminEmail.upsert({
       where: { email },
-      update: { isManager: false, isLeadInstructor: false, ...(defaultProgramId ? { defaultProgramId } : {}), ...(color ? { color } : {}) },
-      create: { email, isManager: false, isLeadInstructor: false, defaultProgramId, ...(color ? { color } : {}) },
+      update: { isManager: false, isLeadInstructor: false, isActive, ...(defaultProgramId ? { defaultProgramId } : {}), ...(color ? { color } : {}) },
+      create: { email, isManager: false, isLeadInstructor: false, isActive, defaultProgramId, ...(color ? { color } : {}) },
     });
-    // If they already have a User record, set program + color
     if (defaultProgramId) {
       const user = await prisma.user.findFirst({ where: { email } });
       if (user) {
@@ -64,21 +64,21 @@ export async function POST(request: Request) {
   } else if (role === 'manager') {
     await prisma.adminEmail.upsert({
       where: { email },
-      update: { isManager: true, isLeadInstructor: true, ...(defaultProgramId ? { defaultProgramId } : {}) },
-      create: { email, isManager: true, isLeadInstructor: true, defaultProgramId },
+      update: { isManager: true, isLeadInstructor: true, isActive, ...(defaultProgramId ? { defaultProgramId } : {}) },
+      create: { email, isManager: true, isLeadInstructor: true, isActive, defaultProgramId },
     });
   } else {
     // leadInstructor
     await prisma.adminEmail.upsert({
       where: { email },
-      update: { isLeadInstructor: true, ...(defaultProgramId ? { defaultProgramId } : {}) },
-      create: { email, isLeadInstructor: true, defaultProgramId },
+      update: { isLeadInstructor: true, isActive, ...(defaultProgramId ? { defaultProgramId } : {}) },
+      create: { email, isLeadInstructor: true, isActive, defaultProgramId },
     });
   }
 
-  // Send invite email if SMTP is configured
+  // Send invite email only when granting access, and only if SMTP is configured
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM, NEXTAUTH_URL } = process.env;
-  if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
+  if (isActive && SMTP_HOST && SMTP_USER && SMTP_PASS) {
     const transporter = nodemailer.createTransport({
       host: SMTP_HOST,
       port: Number(SMTP_PORT ?? 587),

@@ -25,8 +25,9 @@ export const authOptions: NextAuthOptions = {
           where: { email: user.email ?? '' },
         });
         const isLeadInstructor = adminRecord?.isLeadInstructor ?? true;
-        session.user.isAdmin = !!adminRecord && (adminRecord.isManager || isLeadInstructor);
-        session.user.isManager = adminRecord?.isManager ?? false;
+        const active = adminRecord?.isActive ?? true;
+        session.user.isAdmin = !!adminRecord && active && (adminRecord.isManager || isLeadInstructor);
+        session.user.isManager = (adminRecord?.isManager ?? false) && active;
 
         // Default program: prefer User record; fall back to AdminEmail preset
         try {
