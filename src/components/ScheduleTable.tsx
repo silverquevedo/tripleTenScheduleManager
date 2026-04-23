@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Member, Shift, ShiftType } from '@/types';
+import { getBadgeColor } from '@/lib/colors';
 
 interface ScheduleTableProps {
   programId: string | null;
@@ -164,8 +165,8 @@ export function ScheduleTable({
                         key={k}
                         className="inline-block rounded-full animate-pulse"
                         style={{
-                          backgroundColor: m ? m.color : '#e5e5e3',
-                          opacity: 0.25,
+                          backgroundColor: m ? getBadgeColor(m.color).bg : '#e5e5e3',
+                          opacity: 0.5,
                           minWidth: 52,
                           height: 18,
                         }}
@@ -202,15 +203,15 @@ export function ScheduleTable({
                       <span
                         key={`${s.id}-${slotMin}`}
                         title={`${s.memberName} · ${labelOf(s.taskCode)} · ${minsToTime(s.startMin)}–${minsToTime(s.endMin)}`}
-                        className="group inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-white font-medium whitespace-nowrap"
-                        style={{ backgroundColor: colorOf(s.memberName), fontSize: '10px' }}
+                        className="group inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap border"
+                        style={{ backgroundColor: getBadgeColor(colorOf(s.memberName)).bg, borderColor: getBadgeColor(colorOf(s.memberName)).border, color: getBadgeColor(colorOf(s.memberName)).text, fontSize: '10px' }}
                       >
-                        <span className="opacity-90">{s.memberName.split(' ')[0]}</span>
+                        <span>{s.memberName.split(' ')[0]}</span>
                         <strong className="mx-0.5">{s.taskCode}</strong>
                         {isAdmin && (
                           <button
                             onClick={() => handleDeleteShift(s)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity leading-none font-bold text-white/90 hover:text-white"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity leading-none font-bold"
                             title="Remove this shift"
                           >
                             ×
@@ -230,19 +231,20 @@ export function ScheduleTable({
                   {members.map((m) => {
                     const s = shiftLookup.get(`${dayIdx}|${slotMin}|${m.displayName}`);
                     if (!s) return null;
+                    const badge = getBadgeColor(m.color);
                     return (
                       <span
                         key={`${s.id}-${slotMin}`}
                         title={`${s.memberName} · ${labelOf(s.taskCode)} · ${minsToTime(s.startMin)}–${minsToTime(s.endMin)}`}
-                        className="group inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-white font-medium whitespace-nowrap"
-                        style={{ backgroundColor: m.color, fontSize: '10px' }}
+                        className="group inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap border"
+                        style={{ backgroundColor: badge.bg, borderColor: badge.border, color: badge.text, fontSize: '10px' }}
                       >
-                        <span className="opacity-90">{s.memberName.split(' ')[0]}</span>
+                        <span>{s.memberName.split(' ')[0]}</span>
                         <strong className="mx-0.5">{s.taskCode}</strong>
                         {isAdmin && (
                           <button
                             onClick={() => handleDeleteShift(s)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity leading-none font-bold text-white/90 hover:text-white"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity leading-none font-bold"
                             title="Remove this shift"
                           >
                             ×

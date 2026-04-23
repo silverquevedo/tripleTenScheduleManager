@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Member, ShiftType } from '@/types';
+import { getBadgeColor } from '@/lib/colors';
 
 interface ShiftManagerProps {
   members: Member[];
@@ -123,14 +124,14 @@ export function ShiftManager({ members, shiftTypes, programId, onShiftChange }: 
             <span className="text-[#888]">Select instructors…</span>
           ) : selectedMembers.length === 1 ? (
             <>
-              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: members.find((m) => m.displayName === selectedMembers[0])?.color }} />
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: getBadgeColor(members.find((m) => m.displayName === selectedMembers[0])?.color ?? '').text }} />
               <span className="text-[#1a1a1a] truncate max-w-[80px]">{selectedMembers[0]}</span>
             </>
           ) : (
             <>
               <div className="flex -space-x-1">
                 {selectedMembers.slice(0, 3).map((name) => (
-                  <span key={name} className="w-2.5 h-2.5 rounded-full border border-white flex-shrink-0" style={{ backgroundColor: members.find((m) => m.displayName === name)?.color }} />
+                  <span key={name} className="w-2.5 h-2.5 rounded-full border border-white flex-shrink-0" style={{ backgroundColor: getBadgeColor(members.find((m) => m.displayName === name)?.color ?? '').text }} />
                 ))}
               </div>
               <span className="text-[#1a1a1a]">{selectedMembers.length} selected</span>
@@ -145,7 +146,7 @@ export function ShiftManager({ members, shiftTypes, programId, onShiftChange }: 
             {members.length === 0 && <p className="text-[11px] text-[#bbb] px-3 py-2">No members</p>}
             {members.map((m) => (
               <button key={m.id} onClick={() => toggleMember(m.displayName)} className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 text-xs text-left">
-                <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: m.color }} />
+                <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: getBadgeColor(m.color).text }} />
                 <span className="flex-1 text-[#1a1a1a]">{m.displayName}</span>
                 {selectedMembers.includes(m.displayName) && (
                   <svg className="w-3 h-3 text-[#1a1a1a] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

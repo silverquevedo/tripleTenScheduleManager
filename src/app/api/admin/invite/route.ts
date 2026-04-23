@@ -5,18 +5,14 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { isAdmin } from '@/lib/admin';
 
-const COLORS = [
-  '#4f46e5', '#0891b2', '#059669', '#d97706',
-  '#dc2626', '#7c3aed', '#db2777', '#65a30d',
-  '#0284c7', '#ea580c', '#14b8a6', '#8b5cf6',
-];
+import { PALETTE_COLORS } from '@/lib/colors';
 
 async function assignColor(programId: string): Promise<string> {
   const [userCount, adminCount] = await Promise.all([
     prisma.user.count({ where: { defaultProgramId: programId } }),
     prisma.adminEmail.count({ where: { defaultProgramId: programId } }),
   ]);
-  return COLORS[(userCount + adminCount) % COLORS.length];
+  return PALETTE_COLORS[(userCount + adminCount) % PALETTE_COLORS.length];
 }
 
 type InviteRole = 'instructor' | 'leadInstructor' | 'manager';

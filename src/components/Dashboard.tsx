@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import { getBadgeColor } from '@/lib/colors';
 import { Header } from './Header';
 import { TeamMembers } from './TeamMembers';
 import { ShiftManager } from './ShiftManager';
@@ -172,7 +173,7 @@ export function Dashboard() {
                   <div className="flex items-center gap-0.5 ml-1">
                     {members.slice(0, 5).map((m) => (
                       <span key={m.id} className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: m.color }} />
+                        style={{ backgroundColor: getBadgeColor(m.color).text }} />
                     ))}
                   </div>
                   <span className="text-[11px] text-[#888]">({members.length})</span>

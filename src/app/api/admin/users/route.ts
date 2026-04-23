@@ -4,15 +4,11 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { isAdmin } from '@/lib/admin';
 
-const COLORS = [
-  '#4f46e5', '#0891b2', '#059669', '#d97706',
-  '#dc2626', '#7c3aed', '#db2777', '#65a30d',
-  '#0284c7', '#ea580c', '#14b8a6', '#8b5cf6',
-];
+import { PALETTE_COLORS } from '@/lib/colors';
 
 async function assignColor(programId: string): Promise<string> {
   const count = await prisma.user.count({ where: { defaultProgramId: programId } });
-  return COLORS[count % COLORS.length];
+  return PALETTE_COLORS[count % PALETTE_COLORS.length];
 }
 
 export const dynamic = 'force-dynamic';

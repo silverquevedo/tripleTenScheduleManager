@@ -1,7 +1,8 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Member } from '@/types';
+import { BADGE_PALETTE, getBadgeColor } from '@/lib/colors';
 
 interface TeamMembersProps {
   members: Member[];
@@ -13,17 +14,24 @@ interface TeamMembersProps {
 export function TeamMembers({ members, programId, isAdmin, onMembersChange }: TeamMembersProps) {
   const [confirmRemove, setConfirmRemove] = useState<Member | null>(null);
   const [removing, setRemoving] = useState(false);
-  // Live color preview — updated on every mouse move, no API call yet
   const [localColors, setLocalColors] = useState<Record<string, string>>({});
-  const colorInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
-  // Debounce timers — one per member, fires API call after user stops dragging
+  const [openPickerId, setOpenPickerId] = useState<string | null>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const customInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  const handleColorChange = (member: Member, color: string) => {
-    // Instant visual feedback
-    setLocalColors((prev) => ({ ...prev, [member.id]: color }));
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setOpenPickerId(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
-    // Cancel any in-flight debounce for this member
+  const saveColor = (member: Member, color: string) => {
+    setLocalColors((prev) => ({ ...prev, [member.id]: color }));
     clearTimeout(debounceTimers.current[member.id]);
     debounceTimers.current[member.id] = setTimeout(async () => {
       await fetch(`/api/members/${member.id}`, {
@@ -32,7 +40,7 @@ export function TeamMembers({ members, programId, isAdmin, onMembersChange }: Te
         body: JSON.stringify({ color }),
       });
       onMembersChange();
-    }, 400);
+    }, 300);
   };
 
   const handleRemove = async () => {
@@ -54,52 +62,80 @@ export function TeamMembers({ members, programId, isAdmin, onMembersChange }: Te
         </p>
       )}
 
-      {members.map((m) => (
-        <div
-          key={m.id}
-          className="flex items-center gap-2.5 px-1 py-1.5 rounded-lg hover:bg-[#f9f9f8] group"
-        >
-          {/* Color swatch — clickable for admins */}
-          <div className="relative flex-shrink-0">
-            <button
-              disabled={!isAdmin}
-              onClick={() => colorInputRefs.current[m.id]?.click()}
-              className="w-5 h-5 rounded-full border-2 border-white shadow-sm ring-1 ring-black/10 disabled:cursor-default transition-transform hover:scale-110"
-              style={{ backgroundColor: localColors[m.id] ?? m.color }}
-              title={isAdmin ? 'Change color' : m.displayName}
-            />
-            {isAdmin && (
-              <input
-                ref={(el) => { colorInputRefs.current[m.id] = el; }}
-                type="color"
-                value={localColors[m.id] ?? m.color}
-                onChange={(e) => handleColorChange(m, e.target.value)}
-                className="sr-only"
-                aria-label={`Color for ${m.displayName}`}
+      {members.map((m) => {
+        const displayColor = localColors[m.id] ?? m.color;
+        const badge = getBadgeColor(displayColor);
+        const isOpen = openPickerId === m.id;
+
+        return (
+          <div key={m.id} className="flex items-center gap-2.5 px-1 py-1.5 rounded-lg hover:bg-[#f9f9f8] group">
+
+            {/* Color swatch + palette picker */}
+            <div className="relative flex-shrink-0" ref={isOpen ? pickerRef : undefined}>
+              <button
+                disabled={!isAdmin}
+                onClick={() => setOpenPickerId(isOpen ? null : m.id)}
+                className="w-5 h-5 rounded-full border-2 border-white shadow-sm ring-1 ring-black/10 disabled:cursor-default transition-transform hover:scale-110"
+                style={{ backgroundColor: badge.text }}
+                title={isAdmin ? 'Change color' : m.displayName}
               />
+
+              {isOpen && (
+                <div className="absolute left-0 top-7 z-30 bg-white border border-[#e5e5e3] rounded-xl shadow-lg p-2.5 w-[168px]">
+                  <div className="grid grid-cols-5 gap-1.5 mb-2">
+                    {BADGE_PALETTE.map((c) => (
+                      <button
+                        key={c.bg}
+                        title={c.name}
+                        onClick={() => { saveColor(m, c.bg); setOpenPickerId(null); }}
+                        className="w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-1"
+                        style={{
+                          backgroundColor: c.text,
+                          borderColor: displayColor === c.bg ? c.text : 'transparent',
+                          boxShadow: displayColor === c.bg ? `0 0 0 2px ${c.bg}` : undefined,
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => customInputRefs.current[m.id]?.click()}
+                    className="w-full text-[10px] text-[#888] hover:text-[#1a1a1a] py-1 border border-[#e5e5e3] rounded-lg transition-colors hover:border-[#1a1a1a]"
+                  >
+                    Custom color
+                  </button>
+                  <input
+                    ref={(el) => { customInputRefs.current[m.id] = el; }}
+                    type="color"
+                    value={displayColor}
+                    onChange={(e) => saveColor(m, e.target.value)}
+                    className="sr-only"
+                    aria-label={`Custom color for ${m.displayName}`}
+                  />
+                </div>
+              )}
+            </div>
+
+            <span className="flex-1 text-sm text-[#1a1a1a] truncate">{m.displayName}</span>
+            {m.isPending && (
+              <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200 flex-shrink-0">
+                pending
+              </span>
+            )}
+
+            {isAdmin && (
+              <button
+                onClick={() => setConfirmRemove(m)}
+                className="opacity-0 group-hover:opacity-100 transition-opacity w-5 h-5 flex items-center justify-center rounded text-[#bbb] hover:text-red-500 hover:bg-red-50 flex-shrink-0"
+                title={`Remove ${m.displayName} from program`}
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             )}
           </div>
-
-          <span className="flex-1 text-sm text-[#1a1a1a] truncate">{m.displayName}</span>
-          {m.isPending && (
-            <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200 flex-shrink-0">
-              pending
-            </span>
-          )}
-
-          {isAdmin && (
-            <button
-              onClick={() => setConfirmRemove(m)}
-              className="opacity-0 group-hover:opacity-100 transition-opacity w-5 h-5 flex items-center justify-center rounded text-[#bbb] hover:text-red-500 hover:bg-red-50 flex-shrink-0"
-              title={`Remove ${m.displayName} from program`}
-            >
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          )}
-        </div>
-      ))}
+        );
+      })}
 
       {isAdmin && members.length > 0 && (
         <p className="text-[10px] text-[#bbb] pt-2 border-t border-[#f0f0ef]">
