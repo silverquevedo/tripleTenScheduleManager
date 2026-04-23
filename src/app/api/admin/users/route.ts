@@ -144,11 +144,12 @@ export async function PATCH(request: Request) {
   if (grant) {
     await prisma.adminEmail.upsert({
       where: { email },
-      update: {},
-      create: { email },
+      update: { isLeadInstructor: true },
+      create: { email, isLeadInstructor: true },
     });
   } else {
-    await prisma.adminEmail.deleteMany({ where: { email } });
+    // Revoke lead instructor but keep their access as a regular instructor
+    await prisma.adminEmail.updateMany({ where: { email }, data: { isLeadInstructor: false } });
   }
 
   return NextResponse.json({ success: true });
