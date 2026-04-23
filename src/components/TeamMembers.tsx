@@ -72,6 +72,12 @@ export function TeamMembers({ members, isAdmin, onMembersChange }: TeamMembersPr
         </p>
       )}
 
+      {isAdmin && members.length > 0 && (
+        <p className="text-[10px] text-[#bbb] pb-1">
+          Click a color dot to customize. Assign instructors in Settings → Users.
+        </p>
+      )}
+
       {members.map((m) => {
         const displayColor = localColors[m.id] ?? m.color;
         const badge = getBadgeColor(displayColor);
@@ -94,12 +100,6 @@ export function TeamMembers({ members, isAdmin, onMembersChange }: TeamMembersPr
           </div>
         );
       })}
-
-      {isAdmin && members.length > 0 && (
-        <p className="text-[10px] text-[#bbb] pt-2 border-t border-[#f0f0ef]">
-          Click a color dot to customize. Assign instructors in Settings → Users.
-        </p>
-      )}
 
       {/* Fixed-position color picker — escapes any overflow clipping */}
       {openPickerId && activeMember && pickerPos && (
