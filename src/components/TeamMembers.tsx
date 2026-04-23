@@ -75,8 +75,8 @@ export function TeamMembers({ members, programId, isAdmin, onMembersChange }: Te
               <button
                 disabled={!isAdmin}
                 onClick={() => setOpenPickerId(isOpen ? null : m.id)}
-                className="w-5 h-5 rounded-full border-2 border-white shadow-sm ring-1 ring-black/10 disabled:cursor-default transition-transform hover:scale-110"
-                style={{ backgroundColor: badge.text }}
+                className="w-5 h-5 rounded-full border-2 disabled:cursor-default transition-transform hover:scale-110"
+                style={{ backgroundColor: badge.bg, borderColor: badge.border }}
                 title={isAdmin ? 'Change color' : m.displayName}
               />
 
@@ -88,11 +88,12 @@ export function TeamMembers({ members, programId, isAdmin, onMembersChange }: Te
                         key={c.bg}
                         title={c.name}
                         onClick={() => { saveColor(m, c.bg); setOpenPickerId(null); }}
-                        className="w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-1"
+                        className="w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 focus:outline-none"
                         style={{
-                          backgroundColor: c.text,
-                          borderColor: displayColor === c.bg ? c.text : 'transparent',
-                          boxShadow: displayColor === c.bg ? `0 0 0 2px ${c.bg}` : undefined,
+                          backgroundColor: c.bg,
+                          borderColor: displayColor === c.bg ? c.text : c.border,
+                          outline: displayColor === c.bg ? `2px solid ${c.text}` : undefined,
+                          outlineOffset: '1px',
                         }}
                       />
                     ))}

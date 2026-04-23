@@ -172,8 +172,8 @@ export function Dashboard() {
                   <span>Instructors</span>
                   <div className="flex items-center gap-0.5 ml-1">
                     {members.slice(0, 5).map((m) => (
-                      <span key={m.id} className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: getBadgeColor(m.color).text }} />
+                      <span key={m.id} className="w-2 h-2 rounded-full border"
+                        style={{ backgroundColor: getBadgeColor(m.color).bg, borderColor: getBadgeColor(m.color).border }} />
                     ))}
                   </div>
                   <span className="text-[11px] text-[#888]">({members.length})</span>
