@@ -40,7 +40,7 @@ interface ProgramOption {
 
 // ─── Users tab ────────────────────────────────────────────────────────────────
 
-function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEmail?: string | null }) {
+function UsersTab({ superAdmin, currentEmail, myProgramId }: { superAdmin: boolean; currentEmail?: string | null; myProgramId?: string | null }) {
   const [rows, setRows] = useState<UserRow[]>([]);
   const [programs, setPrograms] = useState<ProgramOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +49,7 @@ function UsersTab({ superAdmin, currentEmail }: { superAdmin: boolean; currentEm
   const [openMenuEmail, setOpenMenuEmail] = useState<string | null>(null);
   const [confirmRemoveEmail, setConfirmRemoveEmail] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
-  const [filterProgramId, setFilterProgramId] = useState<string>('');
+  const [filterProgramId, setFilterProgramId] = useState<string>(myProgramId ?? '');
   const [sort, setSort] = useState<{ col: 'name' | 'status' | 'role' | 'program'; dir: 'asc' | 'desc' }>({ col: 'name', dir: 'asc' });
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -1337,7 +1337,7 @@ export function SettingsPage() {
         {/* Content */}
         <div className="flex-1 min-w-0">
           {tab === 'users' && (
-            <UsersTab superAdmin={superAdmin} currentEmail={session?.user?.email} />
+            <UsersTab superAdmin={superAdmin} currentEmail={session?.user?.email} myProgramId={session?.user?.defaultProgramId} />
           )}
           {tab === 'programs' && (
             <ProgramsTab superAdmin={superAdmin} />
