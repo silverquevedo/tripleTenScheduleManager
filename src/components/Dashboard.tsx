@@ -232,7 +232,7 @@ export function Dashboard() {
         {programs.length > 0 && (
           <ScheduleTable
             programId={selectedProgram?.id ?? null}
-            programName={selectedProgram?.name ?? 'All Programs'}
+            programName={selectedProgram?.name ?? ''}
             members={members}
             shiftTypes={shiftTypes}
             refreshTrigger={scheduleRefresh}

@@ -45,13 +45,11 @@ export function Header({ programs, selectedProgram, onProgramChange, isAdmin, is
               <select
                 value={selectedProgram?.id ?? ''}
                 onChange={(e) => {
-                  if (e.target.value === '') { onProgramChange(null); return; }
                   const p = programs.find((p) => p.id === e.target.value);
                   if (p) onProgramChange(p);
                 }}
                 className="text-sm border border-[#e5e5e3] rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-black/10 cursor-pointer"
               >
-                <option value="">All Programs</option>
                 {programs.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
