@@ -8,6 +8,82 @@ import { toast } from 'sonner';
 
 type Tab = 'users' | 'programs' | 'events';
 
+// ─── CustomSelect ─────────────────────────────────────────────────────────────
+
+interface SelectOption { value: string; label: string; }
+
+function CustomSelect({ value, onChange, options, disabled, minWidth = 140 }: {
+  value: string;
+  onChange: (v: string) => void;
+  options: SelectOption[];
+  disabled?: boolean;
+  minWidth?: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
+  const selected = options.find((o) => o.value === value);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropRef.current && !dropRef.current.contains(e.target as Node) &&
+          btnRef.current && !btnRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const toggle = () => {
+    if (disabled) return;
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, minWidth) });
+    }
+    setOpen((v) => !v);
+  };
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        disabled={disabled}
+        onClick={toggle}
+        className="flex items-center gap-1.5 text-xs border border-[#e5e5e3] rounded-lg px-2.5 py-1.5 bg-white hover:border-[#1a1a1a] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        style={{ minWidth }}
+      >
+        <span className="flex-1 text-left text-[#1a1a1a] truncate">{selected?.label ?? '—'}</span>
+        <svg className="w-3 h-3 text-[#aaa] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && pos && (
+        <div
+          ref={dropRef}
+          className="fixed z-[200] bg-white border border-[#e5e5e3] rounded-xl shadow-lg py-1 overflow-y-auto"
+          style={{ top: pos.top, left: pos.left, minWidth: pos.width, maxHeight: 260 }}
+        >
+          {options.map((o) => (
+            <button
+              key={o.value}
+              onClick={() => { onChange(o.value); setOpen(false); }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-gray-50 transition-colors"
+            >
+              {value === o.value
+                ? <svg className="w-3 h-3 text-[#1a1a1a] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                : <span className="w-3 flex-shrink-0" />
+              }
+              <span className={`truncate ${value === o.value ? 'font-medium text-[#1a1a1a]' : 'text-[#555]'}`}>{o.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ActiveUser {
@@ -250,15 +326,16 @@ function UsersTab({ superAdmin, currentEmail, myProgramId }: { superAdmin: boole
                 <label className="text-[11px] text-[#888] uppercase tracking-wide font-medium block mb-1.5">
                   Role
                 </label>
-                <select
+                <CustomSelect
                   value={inviteRole}
-                  onChange={(e) => setInviteRole(e.target.value as typeof inviteRole)}
-                  className="text-sm border border-[#e5e5e3] rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-black/10"
-                >
-                  <option value="instructor">Instructor</option>
-                  <option value="leadInstructor">Lead Instructor</option>
-                  <option value="manager">Manager</option>
-                </select>
+                  onChange={(v) => setInviteRole(v as typeof inviteRole)}
+                  options={[
+                    { value: 'instructor', label: 'Instructor' },
+                    { value: 'leadInstructor', label: 'Lead Instructor' },
+                    { value: 'manager', label: 'Manager' },
+                  ]}
+                  minWidth={180}
+                />
               </div>
             )}
 
@@ -267,16 +344,15 @@ function UsersTab({ superAdmin, currentEmail, myProgramId }: { superAdmin: boole
               <label className="text-[11px] text-[#888] uppercase tracking-wide font-medium block mb-1.5">
                 Program
               </label>
-              <select
+              <CustomSelect
                 value={inviteProgramId}
-                onChange={(e) => setInviteProgramId(e.target.value)}
-                className="text-sm border border-[#e5e5e3] rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-black/10"
-              >
-                <option value="">— None —</option>
-                {programs.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
+                onChange={setInviteProgramId}
+                options={[
+                  { value: '', label: '— None —' },
+                  ...programs.map((p) => ({ value: p.id, label: p.name })),
+                ]}
+                minWidth={180}
+              />
             </div>
           </div>
 
@@ -317,16 +393,15 @@ function UsersTab({ superAdmin, currentEmail, myProgramId }: { superAdmin: boole
       {!loading && programs.length > 0 && (
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-[#888] uppercase tracking-wide font-medium">Filter by program</span>
-          <select
+          <CustomSelect
             value={filterProgramId}
-            onChange={(e) => setFilterProgramId(e.target.value)}
-            className="text-xs border border-[#e5e5e3] rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-black/10"
-          >
-            <option value="">All programs</option>
-            {programs.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
+            onChange={setFilterProgramId}
+            options={[
+              { value: '', label: 'All programs' },
+              ...programs.map((p) => ({ value: p.id, label: p.name })),
+            ]}
+            minWidth={140}
+          />
           {filterProgramId && (
             <button
               onClick={() => setFilterProgramId('')}
@@ -467,17 +542,16 @@ function UsersTab({ superAdmin, currentEmail, myProgramId }: { superAdmin: boole
 
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <select
+                        <CustomSelect
                           value={row.defaultProgramId ?? ''}
+                          onChange={(v) => setDefaultProgram(row.email, v)}
                           disabled={settingProgram === row.email}
-                          onChange={(e) => setDefaultProgram(row.email, e.target.value)}
-                          className="text-xs border border-[#e5e5e3] rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-black/10 disabled:opacity-40 min-w-[140px]"
-                        >
-                          <option value="">— None (see all) —</option>
-                          {programs.map((p) => (
-                            <option key={p.id} value={p.id}>{p.name}</option>
-                          ))}
-                        </select>
+                          options={[
+                            { value: '', label: '— None —' },
+                            ...programs.map((p) => ({ value: p.id, label: p.name })),
+                          ]}
+                          minWidth={160}
+                        />
                       </div>
                     </td>
 
