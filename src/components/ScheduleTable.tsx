@@ -38,6 +38,10 @@ export function ScheduleTable({
   const [fullscreen, setFullscreen] = useState(false);
   const [toolbarOpen, setToolbarOpen] = useState(false);
   const [myShiftsOnly, setMyShiftsOnly] = useState(false);
+  const [nowSlot, setNowSlot] = useState(() => {
+    const d = new Date();
+    return Math.floor((d.getHours() * 60 + d.getMinutes()) / 30) * 30;
+  });
   // IDs of shifts hidden optimistically while awaiting the undo window
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   // Tracks which shifts the user clicked Undo on, to cancel the DELETE
@@ -45,6 +49,15 @@ export function ScheduleTable({
   const scrollWrapRef = useRef<HTMLDivElement>(null);
   // Only scroll on program load/change, not on add/delete refreshes
   const shouldScrollRef = useRef(true);
+
+  useEffect(() => {
+    const tick = () => {
+      const d = new Date();
+      setNowSlot(Math.floor((d.getHours() * 60 + d.getMinutes()) / 30) * 30);
+    };
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   // Reset isInitialLoad and scroll flag whenever the program selection changes
   useEffect(() => {
@@ -229,10 +242,13 @@ export function ScheduleTable({
 
   const dataRows = (
     <tbody>
-      {slotMins.map((slotMin, rowIdx) => (
-        <tr key={slotMin} data-slot={slotMin} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'}>
-          <td className="py-1 px-3 text-[11px] text-[#aaa] font-mono border-r border-[#e5e5e3] whitespace-nowrap align-top sticky left-0 z-[1]"
-            style={{ backgroundColor: rowIdx % 2 === 0 ? '#ffffff' : '#fafafa' }}>
+      {slotMins.map((slotMin, rowIdx) => {
+        const isNow = slotMin === nowSlot;
+        const rowBg = isNow ? '#eff6ff' : rowIdx % 2 === 0 ? '#ffffff' : '#fafafa';
+        return (
+        <tr key={slotMin} data-slot={slotMin} style={{ backgroundColor: rowBg }}>
+          <td className="py-1 text-[11px] font-mono border-r border-[#e5e5e3] whitespace-nowrap align-top sticky left-0 z-[1]"
+            style={{ backgroundColor: rowBg, paddingLeft: isNow ? '10px' : '12px', paddingRight: '12px', borderLeft: isNow ? '2px solid #93c5fd' : undefined, color: isNow ? '#3b82f6' : '#aaa' }}>
             {minsToTime(slotMin)}
           </td>
           {DAYS.map((_, dayIdx) => {
@@ -304,7 +320,8 @@ export function ScheduleTable({
             );
           })}
         </tr>
-      ))}
+        );
+      })}
     </tbody>
   );
 
