@@ -310,9 +310,9 @@ export function ScheduleTable({
 
   const tableGrid = (
     <table className="border-separate border-spacing-0 w-full">
-        <thead className="sticky top-0 z-[1]">
+        <thead className="sticky top-0 z-[2]">
           <tr>
-            <th className="text-left py-2 px-3 text-[11px] font-medium text-[#888] w-14 border-b border-r border-[#e5e5e3] bg-white sticky left-0 z-[2]">
+            <th className="text-left py-2 px-3 text-[11px] font-medium text-[#888] w-14 border-b border-r border-[#e5e5e3] bg-white sticky left-0 z-[3]">
               Time
             </th>
             {DAYS.map((d, i) => (
