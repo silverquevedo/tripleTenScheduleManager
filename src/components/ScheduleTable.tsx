@@ -116,23 +116,53 @@ export function ScheduleTable({
     return map;
   }, [visibleShifts]);
 
-  /** Optimistic delete with 8-second undo window via Sonner toast */
-  const handleDeleteShift = (shift: Shift) => {
-    // Hide immediately
+  /** Delete a single 30-min slot. If the shift spans multiple slots, splits it. */
+  const handleDeleteSlot = (shift: Shift, slotMin: number) => {
+    // Optimistically hide the original shift right away
     setHiddenIds((prev) => new Set(prev).add(shift.id));
 
-    const commit = () => {
+    // Segments that survive after removing the clicked slot
+    const before = slotMin > shift.startMin
+      ? { startMin: shift.startMin, endMin: slotMin }
+      : null;
+    const after = slotMin + 30 < shift.endMin
+      ? { startMin: slotMin + 30, endMin: shift.endMin }
+      : null;
+    const isSplit = before || after;
+
+    const commit = async () => {
       if (undoneRef.current.has(shift.id)) {
         undoneRef.current.delete(shift.id);
         return;
       }
-      // Remove from local state (no re-fetch needed — avoids the reappear glitch)
+      // Remove original from local state
       setShifts((prev) => prev.filter((s) => s.id !== shift.id));
       setHiddenIds((prev) => { const next = new Set(prev); next.delete(shift.id); return next; });
-      fetch(`/api/shifts/${shift.id}`, { method: 'DELETE' });
+      await fetch(`/api/shifts/${shift.id}`, { method: 'DELETE' });
+
+      // Re-create the surviving segments
+      if (isSplit) {
+        const segs = [before, after].filter(Boolean) as { startMin: number; endMin: number }[];
+        for (const seg of segs) {
+          await fetch('/api/shifts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              programId: shift.programId,
+              memberNames: [shift.memberName],
+              taskCode: shift.taskCode,
+              days: [shift.dayOfWeek],
+              startMin: seg.startMin,
+              endMin: seg.endMin,
+              sessions: 1,
+            }),
+          });
+        }
+        fetchShifts();
+      }
     };
 
-    toast('Shift removed', {
+    toast('Slot removed', {
       duration: 8000,
       action: {
         label: 'Undo',
@@ -150,7 +180,7 @@ export function ScheduleTable({
     <tbody>
       {Array.from({ length: 12 }).map((_, i) => (
         <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'}>
-          <td className="py-1 px-3 border-r border-[#e5e5e3] align-top">
+          <td className="py-1 px-3 border-r border-[#e5e5e3] align-top sticky left-0 bg-white z-[1]">
             <div className="h-3 w-9 rounded bg-[#e5e5e3] animate-pulse" />
           </td>
           {DAYS.map((_, j) => {
@@ -186,7 +216,8 @@ export function ScheduleTable({
     <tbody>
       {slotMins.map((slotMin, rowIdx) => (
         <tr key={slotMin} data-slot={slotMin} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'}>
-          <td className="py-1 px-3 text-[11px] text-[#aaa] font-mono border-r border-[#e5e5e3] whitespace-nowrap align-top">
+          <td className="py-1 px-3 text-[11px] text-[#aaa] font-mono border-r border-[#e5e5e3] whitespace-nowrap align-top sticky left-0 z-[1]"
+            style={{ backgroundColor: rowIdx % 2 === 0 ? '#ffffff' : '#fafafa' }}>
             {minsToTime(slotMin)}
           </td>
           {DAYS.map((_, dayIdx) => {
@@ -210,7 +241,7 @@ export function ScheduleTable({
                         <strong className="mx-0.5">{s.taskCode}</strong>
                         {isAdmin && (
                           <button
-                            onClick={() => handleDeleteShift(s)}
+                            onClick={() => handleDeleteSlot(s, slotMin)}
                             className="opacity-0 group-hover:opacity-100 transition-opacity leading-none font-bold"
                             title="Remove this shift"
                           >
@@ -243,7 +274,7 @@ export function ScheduleTable({
                         <strong className="mx-0.5">{s.taskCode}</strong>
                         {isAdmin && (
                           <button
-                            onClick={() => handleDeleteShift(s)}
+                            onClick={() => handleDeleteSlot(s, slotMin)}
                             className="opacity-0 group-hover:opacity-100 transition-opacity leading-none font-bold"
                             title="Remove this shift"
                           >
@@ -266,7 +297,7 @@ export function ScheduleTable({
     <table className="border-separate border-spacing-0 w-full">
         <thead className="sticky top-0 z-[1]">
           <tr>
-            <th className="text-left py-2 px-3 text-[11px] font-medium text-[#888] w-14 border-b border-[#e5e5e3] bg-white">
+            <th className="text-left py-2 px-3 text-[11px] font-medium text-[#888] w-14 border-b border-r border-[#e5e5e3] bg-white sticky left-0 z-[2]">
               Time
             </th>
             {DAYS.map((d, i) => (
