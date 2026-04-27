@@ -130,12 +130,16 @@ export function ScheduleTable({
       : null;
     const isSplit = before || after;
 
+    // Guard against double-commit (onAutoClose + onDismiss can both fire)
+    let committed = false;
     const commit = async () => {
+      if (committed) return;
+      committed = true;
       if (undoneRef.current.has(shift.id)) {
         undoneRef.current.delete(shift.id);
         return;
       }
-      // Remove original from local state
+      // Remove original from local state then delete from server
       setShifts((prev) => prev.filter((s) => s.id !== shift.id));
       setHiddenIds((prev) => { const next = new Set(prev); next.delete(shift.id); return next; });
       await fetch(`/api/shifts/${shift.id}`, { method: 'DELETE' });
@@ -374,7 +378,7 @@ export function ScheduleTable({
           </div>
         )}
 
-        <div ref={scrollWrapRef} className="overflow-auto max-h-[520px] px-4 pb-4">
+        <div ref={scrollWrapRef} className="overflow-auto max-h-[520px] pb-4">
           {tableGrid}
         </div>
       </div>
@@ -406,7 +410,7 @@ export function ScheduleTable({
             </button>
             </div>
           </div>
-          <div className="flex-1 overflow-auto px-5 pb-5">{tableGrid}</div>
+          <div className="flex-1 overflow-auto pb-5">{tableGrid}</div>
         </div>
       )}
 
