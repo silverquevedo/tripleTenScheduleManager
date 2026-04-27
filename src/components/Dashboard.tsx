@@ -237,6 +237,7 @@ export function Dashboard() {
             shiftTypes={shiftTypes}
             refreshTrigger={scheduleRefresh}
             isAdmin={isAdmin}
+            currentUserEmail={session?.user?.email}
             toolbar={isAdmin && selectedProgram ? (
               <ShiftManager
                 members={members}

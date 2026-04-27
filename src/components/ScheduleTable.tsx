@@ -12,6 +12,7 @@ interface ScheduleTableProps {
   shiftTypes: ShiftType[];
   refreshTrigger: number;
   isAdmin: boolean;
+  currentUserEmail?: string | null;
   toolbar?: React.ReactNode;
 }
 
@@ -29,13 +30,14 @@ function minsToTime(m: number) {
 
 
 export function ScheduleTable({
-  programId, programName, members, shiftTypes, refreshTrigger, isAdmin, toolbar,
+  programId, programName, members, shiftTypes, refreshTrigger, isAdmin, currentUserEmail, toolbar,
 }: ScheduleTableProps) {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
   const [toolbarOpen, setToolbarOpen] = useState(false);
+  const [myShiftsOnly, setMyShiftsOnly] = useState(!isAdmin);
   // IDs of shifts hidden optimistically while awaiting the undo window
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   // Tracks which shifts the user clicked Undo on, to cancel the DELETE
@@ -100,7 +102,16 @@ export function ScheduleTable({
   const labelOf = (code: string) =>
     shiftTypes.find((st) => st.code === code)?.label ?? code;
 
-  const visibleShifts = shifts.filter((s) => !hiddenIds.has(s.id));
+  const myDisplayName = useMemo(
+    () => members.find((m) => m.email === currentUserEmail)?.displayName ?? null,
+    [members, currentUserEmail],
+  );
+
+  const visibleShifts = useMemo(() => {
+    const base = shifts.filter((s) => !hiddenIds.has(s.id));
+    if (myShiftsOnly && myDisplayName) return base.filter((s) => s.memberName === myDisplayName);
+    return base;
+  }, [shifts, hiddenIds, myShiftsOnly, myDisplayName]);
 
   // Map keyed by `${dayOfWeek}|${timeMin}|${memberName}` → Shift
   // Built by expanding each shift across its 30-min slots
@@ -329,6 +340,22 @@ export function ScheduleTable({
         {loading && !isInitialLoad && <span className="text-[11px] text-[#bbb]">Loading…</span>}
       </div>
       <div className="flex items-center gap-2">
+        {myDisplayName && (
+          <button
+            onClick={() => setMyShiftsOnly((v) => !v)}
+            className={`flex items-center gap-1.5 text-xs font-medium border rounded-lg px-3 py-1.5 transition-colors ${
+              myShiftsOnly
+                ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                : 'text-[#888] border-[#e5e5e3] hover:text-[#1a1a1a] hover:border-[#1a1a1a]'
+            }`}
+            title={myShiftsOnly ? 'Show all instructors' : 'Show only my shifts'}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            My shifts
+          </button>
+        )}
         {toolbar && (
           <button
             onClick={() => setToolbarOpen((v) => !v)}
