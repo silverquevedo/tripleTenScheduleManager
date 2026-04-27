@@ -37,7 +37,7 @@ export function ScheduleTable({
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
   const [toolbarOpen, setToolbarOpen] = useState(false);
-  const [myShiftsOnly, setMyShiftsOnly] = useState(!isAdmin);
+  const [myShiftsOnly, setMyShiftsOnly] = useState(false);
   // IDs of shifts hidden optimistically while awaiting the undo window
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   // Tracks which shifts the user clicked Undo on, to cancel the DELETE
@@ -341,20 +341,24 @@ export function ScheduleTable({
       </div>
       <div className="flex items-center gap-2">
         {myDisplayName && (
-          <button
-            onClick={() => setMyShiftsOnly((v) => !v)}
-            className={`flex items-center gap-1.5 text-xs font-medium border rounded-lg px-3 py-1.5 transition-colors ${
-              myShiftsOnly
-                ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                : 'text-[#888] border-[#e5e5e3] hover:text-[#1a1a1a] hover:border-[#1a1a1a]'
-            }`}
-            title={myShiftsOnly ? 'Show all instructors' : 'Show only my shifts'}
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            My shifts
-          </button>
+          <div className="flex items-center rounded-lg border border-[#e5e5e3] overflow-hidden text-xs font-medium">
+            <button
+              onClick={() => setMyShiftsOnly(false)}
+              className={`px-3 py-1.5 transition-colors ${
+                !myShiftsOnly ? 'bg-[#1a1a1a] text-white' : 'text-[#888] hover:text-[#1a1a1a] hover:bg-gray-50'
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setMyShiftsOnly(true)}
+              className={`px-3 py-1.5 border-l border-[#e5e5e3] transition-colors ${
+                myShiftsOnly ? 'bg-[#1a1a1a] text-white' : 'text-[#888] hover:text-[#1a1a1a] hover:bg-gray-50'
+              }`}
+            >
+              My shifts
+            </button>
+          </div>
         )}
         {toolbar && (
           <button
