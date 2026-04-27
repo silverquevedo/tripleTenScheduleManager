@@ -40,22 +40,36 @@ export async function POST(request: Request) {
       : [{ slotStart: startMin, slotEnd: endMin }];
 
   let created = 0;
+  let skipped = 0;
   for (const memberName of memberNames) {
     for (const day of days) {
       for (const { slotStart, slotEnd } of slots) {
-        const exists = await prisma.shift.findFirst({
+        // Block exact duplicates (same taskCode)
+        const exact = await prisma.shift.findFirst({
           where: { programId, memberName, taskCode, dayOfWeek: day, startMin: slotStart, endMin: slotEnd },
         });
-        if (!exists) {
-          await prisma.shift.create({
-            data: { programId, memberName, taskCode, dayOfWeek: day, startMin: slotStart, endMin: slotEnd },
-          });
-          created++;
-        }
+        if (exact) continue;
+
+        // Block overlapping slots with any other task code for the same member/day
+        const overlap = await prisma.shift.findFirst({
+          where: {
+            programId,
+            memberName,
+            dayOfWeek: day,
+            startMin: { lt: slotEnd },
+            endMin: { gt: slotStart },
+          },
+        });
+        if (overlap) { skipped++; continue; }
+
+        await prisma.shift.create({
+          data: { programId, memberName, taskCode, dayOfWeek: day, startMin: slotStart, endMin: slotEnd },
+        });
+        created++;
       }
     }
   }
-  return NextResponse.json({ created });
+  return NextResponse.json({ created, skipped });
 }
 
 export async function DELETE(request: Request) {

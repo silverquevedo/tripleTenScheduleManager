@@ -31,7 +31,7 @@ function startOptions(duration: number) {
   return Array.from({ length: count }, (_, i) => 480 + i * 30);
 }
 
-type FeedbackMsg = { text: string; kind: 'success' | 'error' };
+type FeedbackMsg = { text: string; kind: 'success' | 'error' | 'warning' };
 
 export function ShiftManager({ members, shiftTypes, programId, onShiftChange }: ShiftManagerProps) {
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
@@ -101,10 +101,13 @@ export function ShiftManager({ members, shiftTypes, programId, onShiftChange }: 
       });
       const data = await res.json();
       if (!res.ok) { flash(data.error ?? 'An error occurred.', 'error'); return; }
-      flash(
-        action === 'add' ? `Added ${data.created} shift(s).` : `Removed ${data.deleted} shift(s).`,
-        'success'
-      );
+      if (action === 'add') {
+        if (data.created > 0) flash(`Added ${data.created} shift(s).`, 'success');
+        if (data.skipped > 0) flash(`${data.skipped} slot(s) skipped — instructor already has a shift in that time.`, 'warning');
+        if (data.created === 0 && !data.skipped) flash('No new shifts added.', 'success');
+      } else {
+        flash(`Removed ${data.deleted} shift(s).`, 'success');
+      }
       onShiftChange();
     } finally {
       setLoading(false);
@@ -243,7 +246,7 @@ export function ShiftManager({ members, shiftTypes, programId, onShiftChange }: 
 
       {feedback && (
         <span className={`text-[11px] px-2.5 py-1 rounded-lg border flex-shrink-0 ${
-          feedback.kind === 'success' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'
+          feedback.kind === 'success' ? 'bg-green-50 text-green-700 border-green-200' : feedback.kind === 'warning' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-red-50 text-red-700 border-red-200'
         }`}>
           {feedback.text}
         </span>
