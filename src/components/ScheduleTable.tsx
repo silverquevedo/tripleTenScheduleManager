@@ -38,10 +38,11 @@ export function ScheduleTable({
   const [fullscreen, setFullscreen] = useState(false);
   const [toolbarOpen, setToolbarOpen] = useState(false);
   const [myShiftsOnly, setMyShiftsOnly] = useState(false);
-  const [nowSlot, setNowSlot] = useState(() => {
-    const d = new Date();
-    return Math.floor((d.getHours() * 60 + d.getMinutes()) / 30) * 30;
-  });
+  const getEasternSlot = () => {
+    const eastern = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    return Math.floor((eastern.getHours() * 60 + eastern.getMinutes()) / 30) * 30;
+  };
+  const [nowSlot, setNowSlot] = useState(getEasternSlot);
   // IDs of shifts hidden optimistically while awaiting the undo window
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   // Tracks which shifts the user clicked Undo on, to cancel the DELETE
@@ -51,11 +52,7 @@ export function ScheduleTable({
   const shouldScrollRef = useRef(true);
 
   useEffect(() => {
-    const tick = () => {
-      const d = new Date();
-      setNowSlot(Math.floor((d.getHours() * 60 + d.getMinutes()) / 30) * 30);
-    };
-    const id = setInterval(tick, 60_000);
+    const id = setInterval(() => setNowSlot(getEasternSlot()), 60_000);
     return () => clearInterval(id);
   }, []);
 
@@ -248,7 +245,8 @@ export function ScheduleTable({
         return (
         <tr key={slotMin} data-slot={slotMin} style={{ backgroundColor: rowBg }}>
           <td className="py-1 text-[11px] font-mono border-r border-[#e5e5e3] whitespace-nowrap align-top sticky left-0 z-[1]"
-            style={{ backgroundColor: rowBg, paddingLeft: isNow ? '10px' : '12px', paddingRight: '12px', borderLeft: isNow ? '2px solid #93c5fd' : undefined, color: isNow ? '#3b82f6' : '#aaa' }}>
+            style={{ backgroundColor: rowBg, paddingLeft: isNow ? '10px' : '12px', paddingRight: '12px', borderLeft: isNow ? '2px solid #93c5fd' : undefined, color: isNow ? '#3b82f6' : '#aaa' }}
+            title={isNow ? new Date().toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit', hour12: true }) + ' Eastern Time' : undefined}>
             {minsToTime(slotMin)}
           </td>
           {DAYS.map((_, dayIdx) => {
@@ -351,7 +349,7 @@ export function ScheduleTable({
         <h2 className="text-sm font-semibold text-[#1a1a1a]">Weekly Schedule</h2>
         {visibleShifts.length > 0 && (
           <span className="text-[11px] bg-gray-100 text-[#888] px-2 py-0.5 rounded-full">
-            {visibleShifts.length} shift{visibleShifts.length !== 1 ? 's' : ''}
+            {visibleShifts.length} Shift{visibleShifts.length !== 1 ? 's' : ''}, Eastern Time
           </span>
         )}
         {loading && !isInitialLoad && <span className="text-[11px] text-[#bbb]">Loading…</span>}
@@ -440,7 +438,7 @@ export function ScheduleTable({
               <span className="text-[11px] text-[#888]">{programName}</span>
               {visibleShifts.length > 0 && (
                 <span className="text-[11px] bg-gray-100 text-[#888] px-2 py-0.5 rounded-full">
-                  {visibleShifts.length} shift{visibleShifts.length !== 1 ? 's' : ''}
+                  {visibleShifts.length} Shift{visibleShifts.length !== 1 ? 's' : ''}, Eastern Time
                 </span>
               )}
               {loading && !isInitialLoad && <span className="text-[11px] text-[#bbb]">Loading…</span>}
