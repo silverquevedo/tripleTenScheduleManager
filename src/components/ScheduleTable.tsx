@@ -123,6 +123,14 @@ export function ScheduleTable({
     return base;
   }, [shifts, hiddenIds, myShiftsOnly, myDisplayName]);
 
+  const taskBreakdown = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const s of visibleShifts) {
+      counts[s.taskCode] = (counts[s.taskCode] ?? 0) + 1;
+    }
+    return counts;
+  }, [visibleShifts]);
+
   // Map keyed by `${dayOfWeek}|${timeMin}|${memberName}` → Shift
   // Built by expanding each shift across its 30-min slots
   const shiftLookup = useMemo(() => {
@@ -352,6 +360,13 @@ export function ScheduleTable({
             {visibleShifts.length} Shift{visibleShifts.length !== 1 ? 's' : ''}, Eastern Time
           </span>
         )}
+        {isAdmin && visibleShifts.length > 0 && (
+          <span className="text-[11px] bg-gray-100 text-[#888] px-2 py-0.5 rounded-full">
+            {Object.entries(taskBreakdown).map(([code, count], i) => (
+              <span key={code}>{i > 0 && ' · '}{count} {code}</span>
+            ))}
+          </span>
+        )}
         {loading && !isInitialLoad && <span className="text-[11px] text-[#bbb]">Loading…</span>}
       </div>
       <div className="flex items-center gap-2">
@@ -439,6 +454,13 @@ export function ScheduleTable({
               {visibleShifts.length > 0 && (
                 <span className="text-[11px] bg-gray-100 text-[#888] px-2 py-0.5 rounded-full">
                   {visibleShifts.length} Shift{visibleShifts.length !== 1 ? 's' : ''}, Eastern Time
+                </span>
+              )}
+              {isAdmin && visibleShifts.length > 0 && (
+                <span className="text-[11px] bg-gray-100 text-[#888] px-2 py-0.5 rounded-full">
+                  {Object.entries(taskBreakdown).map(([code, count], i) => (
+                    <span key={code}>{i > 0 && ' · '}{count} {code}</span>
+                  ))}
                 </span>
               )}
               {loading && !isInitialLoad && <span className="text-[11px] text-[#bbb]">Loading…</span>}
