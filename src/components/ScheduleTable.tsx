@@ -130,10 +130,11 @@ export function ScheduleTable({
   const taskBreakdown = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const s of visibleShifts) {
-      counts[s.taskCode] = (counts[s.taskCode] ?? 0) + 1;
+      const unit = shiftTypes.find((st) => st.code === s.taskCode)?.durationMin ?? 30;
+      counts[s.taskCode] = (counts[s.taskCode] ?? 0) + (s.endMin - s.startMin) / unit;
     }
     return counts;
-  }, [visibleShifts]);
+  }, [visibleShifts, shiftTypes]);
 
   // Map keyed by `${dayOfWeek}|${timeMin}|${memberName}` → Shift
   // Built by expanding each shift across its 30-min slots
