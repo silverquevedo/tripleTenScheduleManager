@@ -45,6 +45,8 @@ export function ScheduleTable({
   const [nowSlot, setNowSlot] = useState(getEasternSlot);
   // IDs of shifts hidden optimistically while awaiting the undo window
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
+  // Surviving segments shown optimistically while the undo window is open
+  const [optimisticSplits, setOptimisticSplits] = useState<Shift[]>([]);
   // Tracks which shifts the user clicked Undo on, to cancel the DELETE
   const undoneRef = useRef<Set<string>>(new Set());
   const scrollWrapRef = useRef<HTMLDivElement>(null);
@@ -118,10 +120,10 @@ export function ScheduleTable({
   );
 
   const visibleShifts = useMemo(() => {
-    const base = shifts.filter((s) => !hiddenIds.has(s.id));
+    const base = [...shifts.filter((s) => !hiddenIds.has(s.id)), ...optimisticSplits];
     if (myShiftsOnly && myDisplayName) return base.filter((s) => s.memberName === myDisplayName);
     return base;
-  }, [shifts, hiddenIds, myShiftsOnly, myDisplayName]);
+  }, [shifts, hiddenIds, optimisticSplits, myShiftsOnly, myDisplayName]);
 
   const uniqueShiftCount = useMemo(() =>
     new Set(visibleShifts.map((s) => s.memberName)).size,
@@ -161,30 +163,27 @@ export function ScheduleTable({
       : null;
     const isSplit = before || after;
 
-    // Hide original and immediately show surviving segments so the rest of the
-    // block stays visible during the undo window (avoids the full-block flash).
-    const tempShifts: Shift[] = [before, after]
+    // Hide original and show surviving segments immediately so the rest of
+    // the block stays visible during the undo window.
+    const splitPreviews: Shift[] = [before, after]
       .filter(Boolean)
-      .map((seg, i) => ({ ...shift, id: `__temp_${i}_${shift.id}`, ...(seg as { startMin: number; endMin: number }) }));
+      .map((seg) => ({ ...shift, ...(seg as { startMin: number; endMin: number }) }));
 
     setHiddenIds((prev) => new Set(prev).add(shift.id));
-    if (tempShifts.length > 0) setShifts((prev) => [...prev, ...tempShifts]);
-
-    const cleanupTemps = () =>
-      setShifts((prev) => prev.filter((s) => !s.id.startsWith('__temp_')));
+    setOptimisticSplits(splitPreviews);
 
     // Guard against double-commit (onAutoClose + onDismiss can both fire)
     let committed = false;
     const commit = async () => {
       if (committed) return;
       committed = true;
+      setOptimisticSplits([]);
       if (undoneRef.current.has(shift.id)) {
         undoneRef.current.delete(shift.id);
-        cleanupTemps();
         return;
       }
-      // Remove original and temp shifts, then delete from server
-      setShifts((prev) => prev.filter((s) => s.id !== shift.id && !s.id.startsWith('__temp_')));
+      // Remove original from local state then delete from server
+      setShifts((prev) => prev.filter((s) => s.id !== shift.id));
       setHiddenIds((prev) => { const next = new Set(prev); next.delete(shift.id); return next; });
       const deleteRes = await fetch(`/api/shifts/${shift.id}`, { method: 'DELETE' });
       if (!deleteRes.ok) {
