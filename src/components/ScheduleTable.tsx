@@ -381,55 +381,56 @@ export function ScheduleTable({
           )}
           {loading && !isInitialLoad && <span className="text-[11px] text-[#bbb]">Loading…</span>}
         </div>
-      <div className="flex items-center gap-2">
-        {myDisplayName && (
-          <div className="flex items-center rounded-lg border border-[#e5e5e3] overflow-hidden text-xs font-medium">
+        <div className="flex items-center gap-2">
+          {myDisplayName && (
+            <div className="flex items-center rounded-lg border border-[#e5e5e3] overflow-hidden text-xs font-medium">
+              <button
+                onClick={() => setMyShiftsOnly(false)}
+                className={`px-3 py-1.5 transition-colors ${
+                  !myShiftsOnly ? 'bg-[#1a1a1a] text-white' : 'text-[#888] hover:text-[#1a1a1a] hover:bg-gray-50'
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setMyShiftsOnly(true)}
+                className={`px-3 py-1.5 border-l border-[#e5e5e3] transition-colors ${
+                  myShiftsOnly ? 'bg-[#1a1a1a] text-white' : 'text-[#888] hover:text-[#1a1a1a] hover:bg-gray-50'
+                }`}
+              >
+                My shifts
+              </button>
+            </div>
+          )}
+          {toolbar && (
             <button
-              onClick={() => setMyShiftsOnly(false)}
-              className={`px-3 py-1.5 transition-colors ${
-                !myShiftsOnly ? 'bg-[#1a1a1a] text-white' : 'text-[#888] hover:text-[#1a1a1a] hover:bg-gray-50'
+              onClick={() => setToolbarOpen((v) => !v)}
+              className={`flex items-center gap-1.5 text-xs font-medium border rounded-lg px-3 py-1.5 transition-colors ${
+                toolbarOpen
+                  ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]'
+                  : 'text-[#888] border-[#e5e5e3] hover:text-[#1a1a1a] hover:border-[#1a1a1a]'
               }`}
             >
-              All
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round"
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Edit shifts
             </button>
-            <button
-              onClick={() => setMyShiftsOnly(true)}
-              className={`px-3 py-1.5 border-l border-[#e5e5e3] transition-colors ${
-                myShiftsOnly ? 'bg-[#1a1a1a] text-white' : 'text-[#888] hover:text-[#1a1a1a] hover:bg-gray-50'
-              }`}
-            >
-              My shifts
-            </button>
-          </div>
-        )}
-        {toolbar && (
+          )}
           <button
-            onClick={() => setToolbarOpen((v) => !v)}
-            className={`flex items-center gap-1.5 text-xs font-medium border rounded-lg px-3 py-1.5 transition-colors ${
-              toolbarOpen
-                ? 'bg-[#1a1a1a] text-white border-[#1a1a1a]'
-                : 'text-[#888] border-[#e5e5e3] hover:text-[#1a1a1a] hover:border-[#1a1a1a]'
-            }`}
+            onClick={() => setFullscreen(true)}
+            className="flex items-center gap-1.5 text-xs font-medium text-[#888] border border-[#e5e5e3] rounded-lg px-3 py-1.5 hover:text-[#1a1a1a] hover:border-[#1a1a1a] transition-colors"
+            title="Open fullscreen view"
           >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round"
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
             </svg>
-            Edit shifts
+            Expand
           </button>
-        )}
-        <button
-          onClick={() => setFullscreen(true)}
-          className="flex items-center gap-1.5 text-xs font-medium text-[#888] border border-[#e5e5e3] rounded-lg px-3 py-1.5 hover:text-[#1a1a1a] hover:border-[#1a1a1a] transition-colors"
-          title="Open fullscreen view"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"
-            stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round"
-              d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-          </svg>
-          Expand
-        </button>
+        </div>
       </div>
     </div>
   );
