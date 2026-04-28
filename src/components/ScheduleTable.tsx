@@ -152,9 +152,6 @@ export function ScheduleTable({
 
   /** Delete a single 30-min slot. If the shift spans multiple slots, splits it. */
   const handleDeleteSlot = (shift: Shift, slotMin: number) => {
-    // Optimistically hide the original shift right away
-    setHiddenIds((prev) => new Set(prev).add(shift.id));
-
     // Segments that survive after removing the clicked slot
     const before = slotMin > shift.startMin
       ? { startMin: shift.startMin, endMin: slotMin }
@@ -164,6 +161,18 @@ export function ScheduleTable({
       : null;
     const isSplit = before || after;
 
+    // Hide original and immediately show surviving segments so the rest of the
+    // block stays visible during the undo window (avoids the full-block flash).
+    const tempShifts: Shift[] = [before, after]
+      .filter(Boolean)
+      .map((seg, i) => ({ ...shift, id: `__temp_${i}_${shift.id}`, ...(seg as { startMin: number; endMin: number }) }));
+
+    setHiddenIds((prev) => new Set(prev).add(shift.id));
+    if (tempShifts.length > 0) setShifts((prev) => [...prev, ...tempShifts]);
+
+    const cleanupTemps = () =>
+      setShifts((prev) => prev.filter((s) => !s.id.startsWith('__temp_')));
+
     // Guard against double-commit (onAutoClose + onDismiss can both fire)
     let committed = false;
     const commit = async () => {
@@ -171,10 +180,11 @@ export function ScheduleTable({
       committed = true;
       if (undoneRef.current.has(shift.id)) {
         undoneRef.current.delete(shift.id);
+        cleanupTemps();
         return;
       }
-      // Remove original from local state then delete from server
-      setShifts((prev) => prev.filter((s) => s.id !== shift.id));
+      // Remove original and temp shifts, then delete from server
+      setShifts((prev) => prev.filter((s) => s.id !== shift.id && !s.id.startsWith('__temp_')));
       setHiddenIds((prev) => { const next = new Set(prev); next.delete(shift.id); return next; });
       const deleteRes = await fetch(`/api/shifts/${shift.id}`, { method: 'DELETE' });
       if (!deleteRes.ok) {
