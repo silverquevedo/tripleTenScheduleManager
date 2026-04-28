@@ -17,6 +17,7 @@ const DURATION_OPTIONS = [
   { label: '2 hrs',  value: 120 },
   { label: '3 hrs',  value: 180 },
   { label: '4 hrs',  value: 240 },
+  { label: '6 hrs',  value: 360 },
   { label: '8 hrs',  value: 480 },
 ];
 

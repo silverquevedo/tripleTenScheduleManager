@@ -123,12 +123,16 @@ export function ScheduleTable({
     return base;
   }, [shifts, hiddenIds, myShiftsOnly, myDisplayName]);
 
+  const uniqueShiftCount = useMemo(() =>
+    new Set(visibleShifts.map((s) => s.memberName)).size,
+  [visibleShifts]);
+
   const taskBreakdown = useMemo(() => {
-    const hours: Record<string, number> = {};
+    const counts: Record<string, number> = {};
     for (const s of visibleShifts) {
-      hours[s.taskCode] = (hours[s.taskCode] ?? 0) + (s.endMin - s.startMin) / 60;
+      counts[s.taskCode] = (counts[s.taskCode] ?? 0) + 1;
     }
-    return hours;
+    return counts;
   }, [visibleShifts]);
 
   // Map keyed by `${dayOfWeek}|${timeMin}|${memberName}` → Shift
@@ -171,7 +175,12 @@ export function ScheduleTable({
       // Remove original from local state then delete from server
       setShifts((prev) => prev.filter((s) => s.id !== shift.id));
       setHiddenIds((prev) => { const next = new Set(prev); next.delete(shift.id); return next; });
-      await fetch(`/api/shifts/${shift.id}`, { method: 'DELETE' });
+      const deleteRes = await fetch(`/api/shifts/${shift.id}`, { method: 'DELETE' });
+      if (!deleteRes.ok) {
+        setShifts((prev) => [...prev, shift]);
+        toast.error('Could not delete shift — you may not have permission.');
+        return;
+      }
 
       // Re-create the surviving segments
       if (isSplit) {
@@ -351,24 +360,29 @@ export function ScheduleTable({
       </table>
   );
 
+  const taskPills = isAdmin && uniqueShiftCount > 0 && (
+    <div className="flex flex-wrap items-center gap-1.5 px-4 pt-3 pb-1">
+      {Object.entries(taskBreakdown).map(([code, count]) => (
+        <span key={code} className="text-[11px] bg-gray-100 text-[#888] px-2 py-0.5 rounded-full">
+          {code} <span className="font-semibold">{count}</span>
+        </span>
+      ))}
+    </div>
+  );
+
   const headerBar = (
-    <div className="flex items-center justify-between px-4 py-3">
-      <div className="flex items-center gap-3">
-        <h2 className="text-sm font-semibold text-[#1a1a1a]">Weekly Schedule</h2>
-        {visibleShifts.length > 0 && (
-          <span className="text-[11px] bg-gray-100 text-[#888] px-2 py-0.5 rounded-full">
-            {visibleShifts.length} Shift{visibleShifts.length !== 1 ? 's' : ''}, Eastern Time
-          </span>
-        )}
-        {isAdmin && visibleShifts.length > 0 && (
-          <span className="text-[11px] bg-gray-100 text-[#888] px-2 py-0.5 rounded-full">
-            {Object.entries(taskBreakdown).map(([code, hours], i) => (
-              <span key={code}>{i > 0 && ' · '}{code}: {hours}</span>
-            ))}
-          </span>
-        )}
-        {loading && !isInitialLoad && <span className="text-[11px] text-[#bbb]">Loading…</span>}
-      </div>
+    <div>
+      {taskPills}
+      <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center gap-3">
+          <h2 className="text-sm font-semibold text-[#1a1a1a]">Weekly Schedule</h2>
+          {uniqueShiftCount > 0 && (
+            <span className="text-[11px] bg-gray-100 text-[#888] px-2 py-0.5 rounded-full">
+              {uniqueShiftCount} Shift{uniqueShiftCount !== 1 ? 's' : ''}, Eastern Time
+            </span>
+          )}
+          {loading && !isInitialLoad && <span className="text-[11px] text-[#bbb]">Loading…</span>}
+        </div>
       <div className="flex items-center gap-2">
         {myDisplayName && (
           <div className="flex items-center rounded-lg border border-[#e5e5e3] overflow-hidden text-xs font-medium">
@@ -448,22 +462,26 @@ export function ScheduleTable({
       {fullscreen && (
         <div className="fixed inset-0 z-[200] bg-[#f9f9f8] flex flex-col">
           <div className="sticky top-0 bg-white border-b border-[#e5e5e3] px-5 py-3 flex items-center justify-between z-10 flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <h2 className="text-sm font-semibold text-[#1a1a1a]">Weekly Schedule</h2>
-              <span className="text-[11px] text-[#888]">{programName}</span>
-              {visibleShifts.length > 0 && (
-                <span className="text-[11px] bg-gray-100 text-[#888] px-2 py-0.5 rounded-full">
-                  {visibleShifts.length} Shift{visibleShifts.length !== 1 ? 's' : ''}, Eastern Time
-                </span>
-              )}
-              {isAdmin && visibleShifts.length > 0 && (
-                <span className="text-[11px] bg-gray-100 text-[#888] px-2 py-0.5 rounded-full">
-                  {Object.entries(taskBreakdown).map(([code, count], i) => (
-                    <span key={code}>{i > 0 && ' · '}{count} {code}</span>
+            <div className="flex flex-col gap-1">
+              {isAdmin && uniqueShiftCount > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {Object.entries(taskBreakdown).map(([code, count]) => (
+                    <span key={code} className="text-[11px] bg-gray-100 text-[#888] px-2 py-0.5 rounded-full">
+                      {code} <span className="font-semibold">{count}</span>
+                    </span>
                   ))}
-                </span>
+                </div>
               )}
-              {loading && !isInitialLoad && <span className="text-[11px] text-[#bbb]">Loading…</span>}
+              <div className="flex items-center gap-3">
+                <h2 className="text-sm font-semibold text-[#1a1a1a]">Weekly Schedule</h2>
+                <span className="text-[11px] text-[#888]">{programName}</span>
+                {uniqueShiftCount > 0 && (
+                  <span className="text-[11px] bg-gray-100 text-[#888] px-2 py-0.5 rounded-full">
+                    {uniqueShiftCount} Shift{uniqueShiftCount !== 1 ? 's' : ''}, Eastern Time
+                  </span>
+                )}
+                {loading && !isInitialLoad && <span className="text-[11px] text-[#bbb]">Loading…</span>}
+              </div>
             </div>
             <div className="flex items-center gap-2">
             <button
