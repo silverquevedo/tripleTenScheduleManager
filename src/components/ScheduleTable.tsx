@@ -124,11 +124,11 @@ export function ScheduleTable({
   }, [shifts, hiddenIds, myShiftsOnly, myDisplayName]);
 
   const taskBreakdown = useMemo(() => {
-    const counts: Record<string, number> = {};
+    const hours: Record<string, number> = {};
     for (const s of visibleShifts) {
-      counts[s.taskCode] = (counts[s.taskCode] ?? 0) + 1;
+      hours[s.taskCode] = (hours[s.taskCode] ?? 0) + (s.endMin - s.startMin) / 60;
     }
-    return counts;
+    return hours;
   }, [visibleShifts]);
 
   // Map keyed by `${dayOfWeek}|${timeMin}|${memberName}` → Shift
@@ -362,8 +362,8 @@ export function ScheduleTable({
         )}
         {isAdmin && visibleShifts.length > 0 && (
           <span className="text-[11px] bg-gray-100 text-[#888] px-2 py-0.5 rounded-full">
-            {Object.entries(taskBreakdown).map(([code, count], i) => (
-              <span key={code}>{i > 0 && ' · '}{count} {code}</span>
+            {Object.entries(taskBreakdown).map(([code, hours], i) => (
+              <span key={code}>{i > 0 && ' · '}{code}: {hours}</span>
             ))}
           </span>
         )}
