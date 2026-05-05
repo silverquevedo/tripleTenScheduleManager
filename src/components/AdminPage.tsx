@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
-import { isSuperAdmin } from '@/lib/super-admins';
+
 
 interface ActiveUser {
   kind: 'active';
@@ -33,7 +33,7 @@ type FeedbackMsg = { text: string; kind: 'success' | 'error' };
 
 export function AdminPage() {
   const { data: session } = useSession();
-  const canManageRoles = isSuperAdmin(session?.user?.email);
+  const canManageRoles = session?.user?.isManager ?? false;
 
   const [rows, setRows] = useState<TableRow[]>([]);
   const [programs, setPrograms] = useState<ProgramOption[]>([]);

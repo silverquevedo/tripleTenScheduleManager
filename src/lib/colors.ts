@@ -26,6 +26,18 @@ export const BADGE_PALETTE: BadgeColor[] = [
 
 export const PALETTE_COLORS = BADGE_PALETTE.map((c) => c.bg);
 
+/** Pick the next color in the rotation based on how many members already exist in the program. */
+export async function assignProgramColor(
+  prisma: { user: { count: (a: { where: object }) => Promise<number> }; adminEmail: { count: (a: { where: object }) => Promise<number> } },
+  programId: string,
+): Promise<string> {
+  const [userCount, adminCount] = await Promise.all([
+    prisma.user.count({ where: { defaultProgramId: programId } }),
+    prisma.adminEmail.count({ where: { defaultProgramId: programId } }),
+  ]);
+  return PALETTE_COLORS[(userCount + adminCount) % PALETTE_COLORS.length];
+}
+
 function hexToRgb(hex: string): [number, number, number] {
   const n = parseInt(hex.replace('#', ''), 16);
   return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];

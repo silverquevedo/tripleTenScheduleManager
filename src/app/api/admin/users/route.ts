@@ -2,12 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { PALETTE_COLORS } from '@/lib/colors';
-
-async function assignColor(programId: string): Promise<string> {
-  const count = await prisma.user.count({ where: { defaultProgramId: programId } });
-  return PALETTE_COLORS[count % PALETTE_COLORS.length];
-}
+import { assignProgramColor } from '@/lib/colors';
 
 export const dynamic = 'force-dynamic';
 
@@ -94,7 +89,7 @@ export async function PATCH(request: Request) {
     if (value) {
       const user = await prisma.user.findFirst({ where: { email } });
       if (user && !user.color) {
-        const color = await assignColor(value);
+        const color = await assignProgramColor(prisma,value);
         await prisma.user.updateMany({ where: { email }, data: { defaultProgramId: value, color } });
       } else {
         await prisma.user.updateMany({ where: { email }, data: { defaultProgramId: value } });

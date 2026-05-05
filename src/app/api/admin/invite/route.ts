@@ -3,15 +3,7 @@ import { getServerSession } from 'next-auth';
 import nodemailer from 'nodemailer';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { PALETTE_COLORS } from '@/lib/colors';
-
-async function assignColor(programId: string): Promise<string> {
-  const [userCount, adminCount] = await Promise.all([
-    prisma.user.count({ where: { defaultProgramId: programId } }),
-    prisma.adminEmail.count({ where: { defaultProgramId: programId } }),
-  ]);
-  return PALETTE_COLORS[(userCount + adminCount) % PALETTE_COLORS.length];
-}
+import { assignProgramColor } from '@/lib/colors';
 
 type InviteRole = 'instructor' | 'leadInstructor' | 'manager';
 
@@ -42,7 +34,7 @@ export async function POST(request: Request) {
   const defaultProgramId = programId || null;
 
   if (role === 'instructor') {
-    const color = defaultProgramId ? await assignColor(defaultProgramId) : null;
+    const color = defaultProgramId ? await assignProgramColor(prisma,defaultProgramId) : null;
     await prisma.adminEmail.upsert({
       where: { email },
       update: { isManager: false, isLeadInstructor: false, isActive, ...(defaultProgramId ? { defaultProgramId } : {}), ...(color ? { color } : {}) },
@@ -51,7 +43,7 @@ export async function POST(request: Request) {
     if (defaultProgramId) {
       const user = await prisma.user.findFirst({ where: { email } });
       if (user) {
-        const color = user.color ?? await assignColor(defaultProgramId);
+        const color = user.color ?? await assignProgramColor(prisma,defaultProgramId);
         await prisma.user.update({ where: { id: user.id }, data: { defaultProgramId, color } });
       }
     }
