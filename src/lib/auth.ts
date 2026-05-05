@@ -20,10 +20,14 @@ export const authOptions: NextAuthOptions = {
         session.user.id = user.id;
         session.user.defaultProgramId = null;
 
-        // Admin check is independent — never silenced by other errors
-        const adminRecord = await prisma.adminEmail.findUnique({
-          where: { email: user.email ?? '' },
-        });
+        // Fetch admin record and user record in parallel
+        const [adminRecord, dbUser] = await Promise.all([
+          prisma.adminEmail.findUnique({ where: { email: user.email ?? '' } }),
+          user.id
+            ? prisma.user.findUnique({ where: { id: user.id }, select: { defaultProgramId: true, color: true } })
+            : Promise.resolve(null),
+        ]);
+
         const isLeadInstructor = adminRecord?.isLeadInstructor ?? true;
         const active = adminRecord?.isActive ?? true;
         session.user.isAdmin = !!adminRecord && active && (adminRecord.isManager || isLeadInstructor);
@@ -32,10 +36,6 @@ export const authOptions: NextAuthOptions = {
         // Default program: prefer User record; fall back to AdminEmail preset
         try {
           if (user.id) {
-            const dbUser = await prisma.user.findUnique({
-              where: { id: user.id },
-              select: { defaultProgramId: true, color: true },
-            });
             const effective = dbUser?.defaultProgramId ?? adminRecord?.defaultProgramId ?? null;
             // On first sign-in, copy the preset from AdminEmail into the User row + assign color
             if (!dbUser?.defaultProgramId && adminRecord?.defaultProgramId) {

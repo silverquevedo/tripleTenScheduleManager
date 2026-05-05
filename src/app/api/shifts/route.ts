@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { isAdmin } from '@/lib/admin';
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
@@ -21,7 +20,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!(await isAdmin(session.user?.email))) {
+  if (!session.user?.isAdmin) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -39,35 +38,42 @@ export async function POST(request: Request) {
         }))
       : [{ slotStart: startMin, slotEnd: endMin }];
 
+  // Fetch all existing shifts for the affected members/days upfront — avoids N+1 per slot
+  const existing = await prisma.shift.findMany({
+    where: { programId, memberName: { in: memberNames }, dayOfWeek: { in: days } },
+    select: { memberName: true, taskCode: true, dayOfWeek: true, startMin: true, endMin: true },
+  });
+
+  // Index exact duplicates for O(1) lookup
+  const exactSet = new Set(
+    existing.map((s) => `${s.memberName}|${s.dayOfWeek}|${s.taskCode}|${s.startMin}|${s.endMin}`)
+  );
+
   let created = 0;
   let skipped = 0;
+  const toCreate: { programId: string; memberName: string; taskCode: string; dayOfWeek: number; startMin: number; endMin: number }[] = [];
+
   for (const memberName of memberNames) {
     for (const day of days) {
+      // Shifts for this member+day, used for overlap checks
+      const memberDayShifts = existing.filter((s) => s.memberName === memberName && s.dayOfWeek === day);
+
       for (const { slotStart, slotEnd } of slots) {
-        // Block exact duplicates (same taskCode)
-        const exact = await prisma.shift.findFirst({
-          where: { programId, memberName, taskCode, dayOfWeek: day, startMin: slotStart, endMin: slotEnd },
-        });
-        if (exact) continue;
+        if (exactSet.has(`${memberName}|${day}|${taskCode}|${slotStart}|${slotEnd}`)) continue;
 
-        // Block overlapping slots with any other task code for the same member/day
-        const overlap = await prisma.shift.findFirst({
-          where: {
-            programId,
-            memberName,
-            dayOfWeek: day,
-            startMin: { lt: slotEnd },
-            endMin: { gt: slotStart },
-          },
-        });
-        if (overlap) { skipped++; continue; }
+        const overlaps = memberDayShifts.some((s) => s.startMin < slotEnd && s.endMin > slotStart);
+        if (overlaps) { skipped++; continue; }
 
-        await prisma.shift.create({
-          data: { programId, memberName, taskCode, dayOfWeek: day, startMin: slotStart, endMin: slotEnd },
-        });
+        toCreate.push({ programId, memberName, taskCode, dayOfWeek: day, startMin: slotStart, endMin: slotEnd });
+        // Add to in-memory list so subsequent slots in this batch see it
+        memberDayShifts.push({ memberName, taskCode, dayOfWeek: day, startMin: slotStart, endMin: slotEnd });
         created++;
       }
     }
+  }
+
+  if (toCreate.length > 0) {
+    await prisma.shift.createMany({ data: toCreate });
   }
   return NextResponse.json({ created, skipped });
 }
@@ -75,7 +81,7 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!(await isAdmin(session.user?.email))) {
+  if (!session.user?.isAdmin) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

@@ -108,11 +108,16 @@ export function ScheduleTable({
   useEffect(() => { fetchShifts(); }, [fetchShifts, refreshTrigger]);
 
 
-  const colorOf = (name: string) =>
-    members.find((m) => m.displayName === name)?.color ?? '#6b7280';
-
-  const labelOf = (code: string) =>
-    shiftTypes.find((st) => st.code === code)?.label ?? code;
+  const colorMap = useMemo(
+    () => new Map(members.map((m) => [m.displayName, m.color])),
+    [members],
+  );
+  const labelMap = useMemo(
+    () => new Map(shiftTypes.map((st) => [st.code, st.label])),
+    [shiftTypes],
+  );
+  const colorOf = (name: string) => colorMap.get(name) ?? '#6b7280';
+  const labelOf = (code: string) => labelMap.get(code) ?? code;
 
   const myDisplayName = useMemo(
     () => members.find((m) => m.email === currentUserEmail)?.displayName ?? null,
@@ -187,16 +192,19 @@ export function ScheduleTable({
       setHiddenIds((prev) => { const next = new Set(prev); next.delete(shift.id); return next; });
       const deleteRes = await fetch(`/api/shifts/${shift.id}`, { method: 'DELETE' });
       if (!deleteRes.ok) {
-        setShifts((prev) => [...prev, shift]);
-        toast.error('Could not delete shift — you may not have permission.');
+        if (deleteRes.status !== 404) {
+          setShifts((prev) => [...prev, shift]);
+          toast.error('Could not delete shift — you may not have permission.');
+        }
         return;
       }
 
       // Re-create the surviving segments
       if (isSplit) {
         const segs = [before, after].filter(Boolean) as { startMin: number; endMin: number }[];
+        let segFailed = false;
         for (const seg of segs) {
-          await fetch('/api/shifts', {
+          const res = await fetch('/api/shifts', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -209,7 +217,9 @@ export function ScheduleTable({
               sessions: 1,
             }),
           });
+          if (!res.ok) segFailed = true;
         }
+        if (segFailed) toast.error('Some shift segments could not be saved.');
         fetchShifts();
       }
     };
@@ -295,7 +305,7 @@ export function ScheduleTable({
                       >
                         <span>{s.memberName.split(' ')[0]}</span>
                         <strong className="mx-0.5">{s.taskCode}</strong>
-                        {isAdmin && (
+                        {isAdmin && !hiddenIds.has(s.id) && (
                           <button
                             onClick={() => handleDeleteSlot(s, slotMin)}
                             className="opacity-0 group-hover:opacity-100 transition-opacity leading-none font-bold"
@@ -328,7 +338,7 @@ export function ScheduleTable({
                       >
                         <span>{s.memberName.split(' ')[0]}</span>
                         <strong className="mx-0.5">{s.taskCode}</strong>
-                        {isAdmin && (
+                        {isAdmin && !hiddenIds.has(s.id) && (
                           <button
                             onClick={() => handleDeleteSlot(s, slotMin)}
                             className="opacity-0 group-hover:opacity-100 transition-opacity leading-none font-bold"

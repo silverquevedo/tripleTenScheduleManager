@@ -3,8 +3,6 @@ import { getServerSession } from 'next-auth';
 import nodemailer from 'nodemailer';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { isAdmin } from '@/lib/admin';
-
 import { PALETTE_COLORS } from '@/lib/colors';
 
 async function assignColor(programId: string): Promise<string> {
@@ -20,7 +18,7 @@ type InviteRole = 'instructor' | 'leadInstructor' | 'manager';
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!(await isAdmin(session.user?.email))) {
+  if (!session.user?.isAdmin) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

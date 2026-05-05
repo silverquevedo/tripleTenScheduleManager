@@ -25,6 +25,7 @@ model Account {
   user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Session {
@@ -33,6 +34,8 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model User {
@@ -46,6 +49,8 @@ model User {
   sessions         Session[]
   createdAt        DateTime  @default(now())
   defaultProgramId String?
+
+  @@index([defaultProgramId])
 }
 
 model VerificationToken {
@@ -73,6 +78,11 @@ model Shift {
   startMin   Int     // minutes from midnight (480 = 08:00, 510 = 08:30 …)
   endMin     Int     // minutes from midnight
   program    Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@index([programId])
+  @@index([programId, memberName])
+  @@index([memberName])
+  @@index([taskCode])
 }
 
 model ShiftType {
@@ -90,4 +100,6 @@ model AdminEmail {
   isLeadInstructor Boolean @default(true)
   color            String?
   isActive         Boolean @default(true)
+
+  @@index([defaultProgramId])
 }

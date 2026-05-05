@@ -118,6 +118,9 @@ export function Dashboard() {
         const match = defaultId ? programList.find((p) => p.id === defaultId) : null;
         setSelectedProgram(match ?? programList[0]);
       }
+    }).catch(() => {
+      // non-fatal — leave programs/shiftTypes empty so the UI renders in a degraded state
+    }).finally(() => {
       setBootstrapping(false);
     });
   }, [status, session]);

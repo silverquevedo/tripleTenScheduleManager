@@ -31,21 +31,21 @@ export async function GET(request: Request) {
   // programId is required — never return members from all programs at once
   if (!programId) return NextResponse.json([]);
 
-  // Active users with this program
-  const users = await prisma.user.findMany({
-    where: { defaultProgramId: programId },
-    orderBy: { name: 'asc' },
-    select: { id: true, name: true, email: true, color: true, defaultProgramId: true },
-  });
+  // Fetch users and pending admin entries in parallel
+  const [users, adminEntries] = await Promise.all([
+    prisma.user.findMany({
+      where: { defaultProgramId: programId },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, email: true, color: true, defaultProgramId: true },
+    }),
+    prisma.adminEmail.findMany({
+      where: { defaultProgramId: programId },
+      orderBy: { email: 'asc' },
+      select: { id: true, email: true, color: true, defaultProgramId: true },
+    }),
+  ]);
 
   const registeredEmails = new Set(users.map((u) => u.email ?? ''));
-
-  // Pending: in AdminEmail with defaultProgramId but no User record yet
-  const adminEntries = await prisma.adminEmail.findMany({
-    where: { defaultProgramId: programId },
-    orderBy: { email: 'asc' },
-    select: { id: true, email: true, color: true, defaultProgramId: true },
-  });
   const pending = adminEntries.filter((a) => !registeredEmails.has(a.email));
 
   const activeMembers = users.map((u, i) => ({
