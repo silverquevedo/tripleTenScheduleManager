@@ -20,6 +20,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'programId required' }, { status: 400 });
   }
 
+  const userProgramId = session.user.defaultProgramId;
+  const isAdmin = session.user.isAdmin ?? false;
+  if (!isAdmin && userProgramId !== programId) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   const [program, shifts] = await Promise.all([
     prisma.program.findUnique({ where: { id: programId } }),
     prisma.shift.findMany({

@@ -9,9 +9,10 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const programId = searchParams.get('programId');
+  if (!programId) return NextResponse.json({ error: 'programId required' }, { status: 400 });
 
   const shifts = await prisma.shift.findMany({
-    where: programId ? { programId } : undefined,
+    where: { programId },
     orderBy: [{ dayOfWeek: 'asc' }, { startMin: 'asc' }],
   });
   return NextResponse.json(shifts);
