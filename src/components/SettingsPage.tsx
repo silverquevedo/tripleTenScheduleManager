@@ -180,24 +180,34 @@ function UsersTab({ superAdmin, currentEmail, myProgramId }: { superAdmin: boole
   const toggleAdmin = async (email: string, grant: boolean) => {
     setToggling(email);
     setOpenMenuEmail(null);
-    await fetch('/api/admin/users', {
+    const res = await fetch('/api/admin/users', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, grant }),
     });
-    fetchData();
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error ?? 'Failed to update role.');
+    } else {
+      fetchData();
+    }
     setToggling(null);
   };
 
   const toggleManager = async (email: string, grant: boolean) => {
     setToggling(email);
     setOpenMenuEmail(null);
-    await fetch('/api/admin/users', {
+    const res = await fetch('/api/admin/users', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, grantManager: grant }),
     });
-    fetchData();
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error ?? 'Failed to update role.');
+    } else {
+      fetchData();
+    }
     setToggling(null);
   };
 

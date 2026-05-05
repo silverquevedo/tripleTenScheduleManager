@@ -28,11 +28,15 @@ export async function POST(request: Request) {
   if (!programId || !memberNames?.length || !taskCode || !days?.length) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
+  if (typeof startMin !== 'number' || typeof endMin !== 'number' || startMin < 0 || endMin > 1440 || startMin >= endMin) {
+    return NextResponse.json({ error: 'Invalid time range' }, { status: 400 });
+  }
+  const safeSessions = Math.min(Math.max(1, Math.floor(sessions ?? 1)), 48);
 
   // For REV, expand into N consecutive 30-min slots; all other tasks are one record.
   const slots: { slotStart: number; slotEnd: number }[] =
-    taskCode === 'REV' && sessions > 1
-      ? Array.from({ length: sessions }, (_, i) => ({
+    taskCode === 'REV' && safeSessions > 1
+      ? Array.from({ length: safeSessions }, (_, i) => ({
           slotStart: startMin + i * 30,
           slotEnd: startMin + (i + 1) * 30,
         }))
@@ -88,6 +92,9 @@ export async function DELETE(request: Request) {
   const { programId, memberNames, taskCode, days, startMin, endMin } = await request.json();
   if (!programId || !memberNames?.length || !taskCode || !days?.length) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+  }
+  if (typeof startMin !== 'number' || typeof endMin !== 'number') {
+    return NextResponse.json({ error: 'startMin and endMin are required' }, { status: 400 });
   }
 
   const result = await prisma.shift.deleteMany({
