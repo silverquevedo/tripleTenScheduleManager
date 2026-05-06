@@ -20,6 +20,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# local notes (never committed)
+NOTES.local.md
+scripts/backup-*.json
+
 # misc
 .DS_Store
 *.pem
