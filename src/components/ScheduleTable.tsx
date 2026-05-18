@@ -175,14 +175,14 @@ export function ScheduleTable({
       .map((seg) => ({ ...shift, ...(seg as { startMin: number; endMin: number }) }));
 
     setHiddenIds((prev) => new Set(prev).add(shift.id));
-    setOptimisticSplits(splitPreviews);
+    setOptimisticSplits((prev) => [...prev.filter((s) => s.id !== shift.id), ...splitPreviews]);
 
     // Guard against double-commit (onAutoClose + onDismiss can both fire)
     let committed = false;
     const commit = async () => {
       if (committed) return;
       committed = true;
-      setOptimisticSplits([]);
+      setOptimisticSplits((prev) => prev.filter((s) => s.id !== shift.id));
       if (undoneRef.current.has(shift.id)) {
         undoneRef.current.delete(shift.id);
         return;
@@ -203,6 +203,7 @@ export function ScheduleTable({
       if (isSplit) {
         const segs = [before, after].filter(Boolean) as { startMin: number; endMin: number }[];
         let segFailed = false;
+        const newShifts: Shift[] = [];
         for (const seg of segs) {
           const res = await fetch('/api/shifts', {
             method: 'POST',
@@ -217,10 +218,13 @@ export function ScheduleTable({
               sessions: 1,
             }),
           });
-          if (!res.ok) segFailed = true;
+          if (!res.ok) { segFailed = true; continue; }
+          const data = await res.json();
+          if (data.shifts) newShifts.push(...data.shifts);
         }
         if (segFailed) toast.error('Some shift segments could not be saved.');
-        fetchShifts();
+        // Update state directly — avoids a full refetch that could race with other pending deletes
+        setShifts((prev) => [...prev.filter((s) => s.id !== shift.id), ...newShifts]);
       }
     };
 

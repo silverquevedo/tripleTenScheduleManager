@@ -77,10 +77,11 @@ export async function POST(request: Request) {
     }
   }
 
+  let createdShifts: { id: string; programId: string; memberName: string; taskCode: string; dayOfWeek: number; startMin: number; endMin: number }[] = [];
   if (toCreate.length > 0) {
-    await prisma.shift.createMany({ data: toCreate });
+    createdShifts = await prisma.shift.createManyAndReturn({ data: toCreate });
   }
-  return NextResponse.json({ created, skipped });
+  return NextResponse.json({ created, skipped, shifts: createdShifts });
 }
 
 export async function DELETE(request: Request) {
